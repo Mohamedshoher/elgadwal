@@ -204,25 +204,6 @@ a.mbtn[hidden]{display:none}
     <button type="button" class="btn primary" id="loginBtn" style="width:100%;min-height:46px">دخول</button>
   </form>
 </div>
-<dialog id="xDlg">
-  <strong>ربط شيت موجود</strong>
-  <p style="margin:8px 0">الصق رابط ملف جوجل شيت الذي بهيكل «جدول الأسبوع» (الأهداف في الصفوف من 2 فصاعدًا، وصف «عدد…» في آخرها). سيطلب جوجل صلاحية تعديل جداول البيانات، فسجّل الدخول بالحساب الذي يملك الملف.</p>
-  <input id="xUrl" placeholder="https://docs.google.com/spreadsheets/d/…" dir="ltr" style="width:100%;font:inherit;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink)">
-  <div class="err2" id="xErr" role="alert"></div>
-  <div class="acts">
-    <button class="btn" id="xNo" type="button">إلغاء</button>
-    <button class="btn primary" id="xYes" type="button">ربط</button>
-  </div>
-</dialog>
-<input type="file" id="impFile" accept="application/json,.json" hidden>
-<dialog id="impDlg">
-  <strong>استيراد نسخة احتياطية؟</strong>
-  <p style="margin:8px 0 0">ستحل النسخة محل أهدافك وسجلك الحاليين لهذا الاسم.</p>
-  <div class="acts">
-    <button class="btn" id="impNo" type="button">إلغاء</button>
-    <button class="btn danger" id="impYes" type="button">استيراد</button>
-  </div>
-</dialog>
 <div class="app">
   <aside class="drawer" id="drawer" aria-label="القائمة الجانبية">
     <div class="dhead">
@@ -232,15 +213,9 @@ a.mbtn[hidden]{display:none}
     <div class="pill" id="status"><span class="dot"></span><span id="statusTxt">جارٍ الاتصال بجوجل شيت…</span></div>
     <div class="menu">
       <button class="mbtn primary" id="addBtn" type="button"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>إضافة هدف</button>
-      <button class="mbtn" id="refresh" type="button"><svg viewBox="0 0 24 24"><path d="M20 11a8 8 0 10-2.3 5.7M20 4v7h-7"/></svg>تحديث من الشيت</button>
       
       <button class="mbtn" id="gBtn" type="button"><svg viewBox="0 0 24 24"><path d="M4 5h16v14H4zM4 10h16M10 5v14"/></svg>ربط جوجل شيت</button>
       <a class="mbtn" id="gOpen" target="_blank" rel="noopener" hidden><svg viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9M18 14v6H4V6h6"/></svg>فتح الشيت</a>
-      <button class="mbtn" id="gX" type="button"><svg viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>ربط شيت موجود</button>
-      <button class="mbtn" id="gOff" type="button" hidden><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>فصل الربط</button>
-      <button class="mbtn" id="exportBtn" type="button"><svg viewBox="0 0 24 24"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>تصدير نسخة احتياطية</button>
-      <button class="mbtn" id="importBtn" type="button"><svg viewBox="0 0 24 24"><path d="M12 15V4M7 9l5-5 5 5M5 20h14"/></svg>استيراد نسخة</button>
-      <button class="mbtn" id="switchBtn" type="button"><svg viewBox="0 0 24 24"><path d="M9 4H5v16h4M16 8l4 4-4 4M20 12H9"/></svg>تبديل المستخدم</button>
       <button class="mbtn" id="histBtn" type="button"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/></svg>سجل الأيام (التقويم)</button>
       <button class="mbtn danger" id="resetBtn" type="button"><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 109-9M3 4v5h5"/></svg>بدء أسبوع جديد</button>
       <button class="mbtn" id="themeBtn" type="button"><span id="themeIcon"></span><span id="themeTxt">الوضع الليلي</span></button>
@@ -483,11 +458,10 @@ function gExt(){return gFile().indexOf("x:")===0}
 function gId(){var f=gFile();return gExt()?f.slice(2):f}
 function gLinked(){return !!(user&&gFile())}
 function gUI(){
-  var b=document.getElementById("gBtn"), o=document.getElementById("gOpen"), f=document.getElementById("gOff");
+  var b=document.getElementById("gBtn"), o=document.getElementById("gOpen");
   var ok=gTok&&Date.now()<gExp;
   b.lastChild.textContent=!gLinked()?"ربط جوجل شيت":(ok?"مزامنة الآن":"إعادة الربط");
   var id=gId(); o.hidden=!id; if(id)o.href="https://docs.google.com/spreadsheets/d/"+id+"/edit";
-  f.hidden=!gLinked();
 }
 function gWait(){
   return new Promise(function(res,rej){
@@ -893,7 +867,6 @@ window.addEventListener("resize",function(){setDrawer(false)});
 document.addEventListener("keydown",function(e){if(e.key==="Escape"&&drawerOpen)setDrawer(false)});
 function fromMenu(fn){return function(){setDrawer(false);fn()}}
 document.getElementById("addBtn").addEventListener("click",fromMenu(function(){openForm(null)}));
-document.getElementById("refresh").addEventListener("click",fromMenu(load));
 document.getElementById("resetBtn").addEventListener("click",fromMenu(function(){
   document.getElementById("wkDate").value=defaultWeekStart();
   document.getElementById("wkErr").textContent="";
@@ -962,50 +935,6 @@ document.getElementById("gBtn").addEventListener("click",async function(){
     await load(); banner(""); if(m){banner(m)}
   }catch(e){gMode=2;sync();gUI();banner(explain(e))}
 });
-var xDlg=document.getElementById("xDlg");
-document.getElementById("gX").addEventListener("click",fromMenu(function(){document.getElementById("xErr").textContent="";document.getElementById("xUrl").value="";xDlg.showModal()}));
-document.getElementById("xNo").addEventListener("click",function(){xDlg.close()});
-document.getElementById("xYes").addEventListener("click",async function(){
-  var u=document.getElementById("xUrl").value.trim(), m=u.match(/\/d\/([a-zA-Z0-9_-]{20,})/)||u.match(/^([a-zA-Z0-9_-]{25,})$/);
-  if(!m){document.getElementById("xErr").textContent="الرابط غير صحيح. انسخه من شريط العنوان وهو مفتوح على الشيت.";return}
-  xDlg.close(); setStatus("busy","جارٍ الربط مع الشيت…");
-  var prior=gFile(); gSetFile("x:"+m[1]); gTok=null; gExp=0; gDirtySet(false);
-  try{var msg=await gConnect(true); await load(); banner(msg||"تم الربط بالشيت."); gUI()}
-  catch(e){gSetFile(prior); gMode=prior?2:0; sync(); gUI(); banner(explain(e))}
-});
-document.getElementById("gOff").addEventListener("click",fromMenu(function(){
-  gSetFile(""); gMode=0; gDirtySet(false); sync(); gUI(); banner("تم فصل الربط. بياناتك باقية على الجهاز وفي الشيت.");
-}));
-document.getElementById("switchBtn").addEventListener("click",fromMenu(function(){try{localStorage.removeItem("wk:last")}catch(_){}gMode=0;gDirty=false;showLogin()}));
-
-/* نسخة احتياطية */
-document.getElementById("exportBtn").addEventListener("click",fromMenu(function(){
-  var d=readData();
-  var blob=new Blob([JSON.stringify({v:1,name:user,items:d.items,hist:d.hist})],{type:"application/json"});
-  var a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="الجدول-الأسبوعي-"+user+".json";
-  document.body.appendChild(a); a.click(); a.remove(); setTimeout(function(){URL.revokeObjectURL(a.href)},1500);
-}));
-var impFile=document.getElementById("impFile"), impDlg=document.getElementById("impDlg"), impData=null;
-document.getElementById("importBtn").addEventListener("click",fromMenu(function(){impFile.value="";impFile.click()}));
-impFile.addEventListener("change",function(){
-  var f=impFile.files&&impFile.files[0]; if(!f)return;
-  var fr=new FileReader();
-  fr.onload=function(){
-    try{
-      var o=JSON.parse(String(fr.result));
-      if(!o||!Array.isArray(o.items)||o.items.some(function(v){return !Array.isArray(v)||v.length<12}))throw 0;
-      impData={items:o.items.slice(0,40),hist:Array.isArray(o.hist)?o.hist:[]};
-      impDlg.showModal();
-    }catch(_){banner("الملف ليس نسخة احتياطية صحيحة.")}
-  };
-  fr.readAsText(f);
-});
-document.getElementById("impNo").addEventListener("click",function(){impDlg.close();impData=null});
-document.getElementById("impYes").addEventListener("click",async function(){
-  impDlg.close(); if(!impData)return;
-  try{saveData(impData);impData=null;await load();banner("تم استيراد النسخة الاحتياطية.")}catch(e){banner(explain(e))}
-});
-
 /* أحداث القائمة الرئيسية */
 document.addEventListener("click",function(e){
   var tk=e.target.closest&&e.target.closest(".tick"); if(tk){toggle(+tk.dataset.row,sel);return}
