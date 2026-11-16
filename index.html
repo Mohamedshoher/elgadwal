@@ -624,8 +624,8 @@ async function gRun(){
       await gPushNow();
       if(!gAgain)gDirtySet(false); gMode=1;
     }while(gAgain);
-  }catch(e){gMode=2; var m=String((e&&e.message)||""); if(/[\u0600-\u06FF]/.test(m))banner(m)}
-  gBusy=false; sync(); gUI();
+  }catch(e){gMode=2; if(!gTok||Date.now()>=gExp)gNeedAuth=true; var m=String((e&&e.message)||""); if(/[\u0600-\u06FF]/.test(m))banner(m)}
+  gBusy=false; if(gMode===1)gNeedAuth=false; sync(); gUI();
 }
 /* ربط أو إعادة ربط أو سحب من الشيت */
 async function gConnect(interactive){
@@ -646,11 +646,38 @@ async function gConnect(interactive){
   gMode=1; gUI();
   return msg;
 }
+/* مزامنة تلقائية */
+var gNeedAuth=false, gPulling=false, gLastPull=0;
+async function gAutoPull(){
+  if(!gLinked()||gPulling||gBusy||gDirty||pending>0||gTimer)return;
+  if(Date.now()-gLastPull<20000)return;
+  gPulling=true; gLastPull=Date.now();
+  try{
+    await gToken(false);
+    var rem=await gPull(gId()), loc=readData();
+    if((rem.items.length||rem.hist.length)&&JSON.stringify(rem)!==JSON.stringify(loc)&&!gDirty&&pending===0){
+      localStorage.setItem(dkey(),JSON.stringify(rem)); await load();
+    }
+    gMode=1; gNeedAuth=false; sync(); gUI();
+  }catch(e){gNeedAuth=true}
+  gPulling=false;
+}
+document.addEventListener("visibilitychange",function(){if(!document.hidden)gAutoPull()});
+window.addEventListener("online",function(){if(gDirty)gSchedule();else gAutoPull()});
+setInterval(function(){if(!document.hidden)gAutoPull()},120000);
+/* إن انتهت الجلسة: أول لمسة تجدّد الربط تلقائيًا */
+document.addEventListener("click",function(e){
+  if(!gNeedAuth||!gLinked()||gBusy||gPulling)return;
+  if(e.target.closest&&e.target.closest("#gBtn"))return;
+  gNeedAuth=false;
+  gConnect(true).then(function(){return load()}).catch(function(){gNeedAuth=true});
+},true);
+
 async function gStart(){
   if(!gLinked()){gUI();return}
   try{gDirty=localStorage.getItem("wk:gd:"+user)==="1"}catch(_){}
   try{await gConnect(false); await load(); sync()}
-  catch(e){gMode=2; sync()}
+  catch(e){gMode=2; if(!gTok||Date.now()>=gExp)gNeedAuth=true; sync()}
   gUI();
 }
 
