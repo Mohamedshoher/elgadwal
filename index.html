@@ -213,6 +213,7 @@ a.mbtn[hidden]{display:none}
     <input id="uName" autocomplete="name" placeholder="اسمك" maxlength="40" aria-label="اسمك">
     <div class="err2" id="loginErr" role="alert"></div>
     <button type="button" class="btn primary" id="loginBtn" style="width:100%;min-height:46px">دخول</button>
+    <button type="button" class="btn" id="restoreBtn" style="width:100%;min-height:46px;margin-top:8px">استعادة جدولي من جوجل شيت</button>
   </form>
 </div>
 <div class="app">
@@ -636,10 +637,11 @@ async function gRun(){
   gBusy=false; if(gMode===1)gNeedAuth=false; sync(); gUI();
 }
 /* ربط أو إعادة ربط أو سحب من الشيت */
-async function gConnect(interactive){
+async function gConnect(interactive,noCreate){
   await gToken(interactive);
   var id=gId(), created=false;
   if(!id){id=await gFind(); if(id)gSetFile(id)}
+  if(!id&&noCreate)throw new Error("لم أجد ملفًا باسم «"+user+"» في حساب جوجل هذا. اكتب الاسم نفسه الذي استخدمته أول مرة، وتأكد أنك اخترت الحساب نفسه.");
   if(!id){id=await gCreate();gSetFile(id);created=true}
   var local=readData(), msg="";
   if(created||gDirty){await gPushNow();gDirtySet(false);msg=created?"تم إنشاء ملف جوجل شيت وحفظ بياناتك فيه.":""}
@@ -965,6 +967,16 @@ async function doLogin(){
   gMode=0; gDirty=false; await load(); gStart();
 }
 document.getElementById("loginBtn").addEventListener("click",doLogin);
+document.getElementById("restoreBtn").addEventListener("click",async function(){
+  var n=nameIn.value.trim().replace(/\s+/g," "), er=document.getElementById("loginErr");
+  if(!n){er.textContent="اكتب اسمك أولًا.";return}
+  user=n; er.textContent="جارٍ الاتصال بجوجل…";
+  try{
+    await gConnect(true,true);
+    try{localStorage.setItem("wk:last",n)}catch(_){}
+    loginEl.hidden=true; er.textContent=""; await load(); gUI();
+  }catch(e){user=null; er.textContent=explain(e)}
+});
 nameIn.addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();doLogin()}});
 document.getElementById("gBtn").addEventListener("click",async function(){
   setDrawer(false);
