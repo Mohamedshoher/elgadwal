@@ -72,6 +72,18 @@ svg{display:block;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:ro
 .wrow b{font-weight:600;text-align:end;font-variant-numeric:tabular-nums}
 
 /* الرأس */
+.bell{position:relative;margin-inline-start:auto}
+.badge{position:absolute;top:-6px;inset-inline-start:-6px;min-width:19px;height:19px;padding:0 5px;border-radius:10px;background:#c0392b;color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;line-height:1}
+.badge[hidden]{display:none}
+#alertDlg h4{margin:14px 0 6px;font-size:14px;color:var(--muted);font-weight:600}
+#alertDlg .arow{padding:8px 0;border-bottom:1px solid var(--line)}
+#alertDlg .arow:last-child{border-bottom:0}
+#alertDlg .aname{font-weight:600}
+#alertDlg .atype{color:var(--muted);font-size:13px}
+#alertDlg .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+#alertDlg .chip{border:1px solid var(--line);background:var(--bg);border-radius:999px;padding:4px 10px;font-size:13px}
+#alertDlg .chip:hover{border-color:var(--accent);color:var(--accent)}
+#alertDlg .scroll{max-height:55vh;overflow:auto}
 .top{display:flex;align-items:center;gap:10px;margin-bottom:12px}
 h1{font-family:var(--font-display);font-size:26px;line-height:1.2;margin:0}
 .sub{color:var(--muted);font-size:13px;font-variant-numeric:tabular-nums}
@@ -233,6 +245,11 @@ a.mbtn[hidden]{display:none}
     <button class="btn primary" id="recOk" type="button">حفظته</button>
   </div>
 </dialog>
+<dialog id="alertDlg">
+  <strong>ما فاتك من أهداف</strong>
+  <div class="scroll" id="alertBody"></div>
+  <div class="acts"><button class="btn" id="alertClose" type="button">إغلاق</button></div>
+</dialog>
 <div class="app">
   <aside class="drawer" id="drawer" aria-label="القائمة الجانبية">
     <div class="dhead">
@@ -266,6 +283,7 @@ a.mbtn[hidden]{display:none}
         <h1>الجدول الأسبوعي</h1>
         <div class="sub" id="sub"></div>
       </div>
+      <button class="icon bell" id="bellBtn" type="button" title="ما فاتك" aria-label="ما فاتك من أهداف"><svg viewBox="0 0 24 24"><path d="M6 17h12l-1.5-2V10a4.5 4.5 0 10-9 0v5L6 17zM10 20h4"/></svg><span class="badge" id="bellBadge" hidden>0</span></button>
       <span class="topdot pill" id="topStatus" style="padding:6px 8px" aria-hidden="true"><span class="dot"></span></span>
     </header>
     <div class="banner" id="banner" hidden role="status"></div>
@@ -361,7 +379,45 @@ var ICON_CHECK='<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg
 var ICON_EDIT='<svg viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4"/></svg>';
 var ICON_DEL='<svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12h10l1-12M9 7V4h6v3"/></svg>';
 
+function missedInfo(){
+  var t=todayIdx(), pos=t<0?6:t, y=pos-1, yest=[], older=[], seen={};
+  items.forEach(function(i){
+    var ym=(y>=0&&!i.days[y]), om=[];
+    for(var d=0;d<y;d++)if(!i.days[d])om.push(d);
+    if(ym){yest.push(i);seen[i.row]=1}
+    if(om.length){older.push({it:i,days:om});seen[i.row]=1}
+  });
+  return {pos:pos,y:y,yest:yest,older:older,count:Object.keys(seen).length};
+}
+function updateBell(){
+  var m=missedInfo(), b=document.getElementById("bellBadge");
+  if(!b)return;
+  b.textContent=m.count; b.hidden=!m.count;
+  document.getElementById("bellBtn").setAttribute("aria-label",m.count?("ما فاتك: "+m.count+" هدف"):"ما فاتك من أهداف");
+}
+function renderAlert(){
+  var m=missedInfo(), h="";
+  if(m.y<0){h='<p>اليوم أول أيام الأسبوع، لا توجد أيام سابقة لعرضها.</p>'}
+  else{
+    if(m.yest.length){
+      h+='<h4>أمس · '+DAYS[m.y]+'</h4>'+m.yest.map(function(i){
+        return '<div class="arow"><div class="aname">'+esc(i.cls)+'</div><div class="atype">'+esc(i.type)+'</div><div class="chips"><button type="button" class="chip" data-arow="'+i.row+'" data-ad="'+m.y+'">تمّ تسجيله</button></div></div>';
+      }).join("");
+    }
+    if(m.older.length){
+      h+='<h4>أيام سابقة من هذا الأسبوع</h4>'+m.older.map(function(o){
+        return '<div class="arow"><div class="aname">'+esc(o.it.cls)+' <span class="atype">· فاتك '+o.days.length+(o.days.length>2?' أيام':' يومًا')+'</span></div><div class="atype">'+esc(o.it.type)+'</div><div class="chips">'+o.days.map(function(d){
+          return '<button type="button" class="chip" data-arow="'+o.it.row+'" data-ad="'+d+'">'+DAYS[d]+' ✓</button>';
+        }).join("")+'</div></div>';
+      }).join("");
+    }
+    if(!m.yest.length&&!m.older.length)h='<p>أحسنت، لا يوجد ما فاتك.</p>';
+    else h+='<p class="atype" style="margin-top:10px">اضغط على اليوم لتسجيل أنك أنجزته.</p>';
+  }
+  document.getElementById("alertBody").innerHTML=h;
+}
 function render(){
+  updateBell();
   var total=items.reduce(function(a,i){return a+i.time},0), t=todayIdx();
   var dp=DAYS.map(function(_,d){var done=items.reduce(function(a,i){return a+(i.days[d]?i.time:0)},0);return total?done/total*100:0});
   var overall=dp.reduce(function(a,b){return a+b},0)/6;
@@ -821,6 +877,13 @@ function showRecovery(code,title){
   document.getElementById("recTitle").textContent=title||"رمز الاسترجاع";
   document.getElementById("recCode").textContent=code; recDlg.showModal();
 }
+var alertDlg=document.getElementById("alertDlg");
+document.getElementById("bellBtn").addEventListener("click",function(){renderAlert();alertDlg.showModal()});
+document.getElementById("alertClose").addEventListener("click",function(){alertDlg.close()});
+document.getElementById("alertBody").addEventListener("click",async function(e){
+  var c=e.target.closest&&e.target.closest("[data-arow]"); if(!c)return;
+  await toggle(+c.dataset.arow,+c.dataset.ad); renderAlert();
+});
 document.getElementById("recOk").addEventListener("click",function(){recDlg.close()});
 recDlg.addEventListener("cancel",function(e){e.preventDefault()});
 document.getElementById("recCopy").addEventListener("click",function(){
