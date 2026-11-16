@@ -141,6 +141,7 @@ form.add input:focus{border-color:var(--accent)}
 .lcard{width:100%;max-width:380px;background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:26px 20px;text-align:center}
 .lcard h2{font-family:var(--font-display);font-size:28px;margin:0 0 6px}
 .lcard p{color:var(--muted);margin:0 0 16px;line-height:1.7;font-size:15px}
+.lcard input+input{margin-top:0}
 .lcard input{font:inherit;font-size:17px;width:100%;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--bg);color:var(--ink);text-align:center;margin-bottom:6px}
 .lcard input:focus{border-color:var(--accent)}
 #splash{position:fixed;inset:0;z-index:100;background:var(--bg);display:flex;align-items:center;justify-content:center;text-align:center;color:var(--muted)}
@@ -209,11 +210,12 @@ a.mbtn[hidden]{display:none}
 <div id="login" hidden>
   <form class="lcard" onsubmit="return false">
     <h2>الجدول الأسبوعي</h2>
-    <p>اكتب اسمك لتبدأ. بياناتك تُحفظ على هذا الجهاز تحت اسمك.</p>
-    <input id="uName" autocomplete="name" placeholder="اسمك" maxlength="40" aria-label="اسمك">
+    <p>سجّل الدخول لتظهر أهدافك على كل أجهزتك.</p>
+    <input id="uName" autocomplete="username" placeholder="اسم المستخدم" maxlength="40" aria-label="اسم المستخدم" autocapitalize="none">
+    <input id="uPass" type="password" autocomplete="current-password" placeholder="كلمة السر" maxlength="100" aria-label="كلمة السر">
     <div class="err2" id="loginErr" role="alert"></div>
     <button type="button" class="btn primary" id="loginBtn" style="width:100%;min-height:46px">دخول</button>
-    <button type="button" class="btn" id="restoreBtn" style="width:100%;min-height:46px;margin-top:8px">استعادة جدولي من جوجل شيت</button>
+    <button type="button" class="btn" id="signupBtn" style="width:100%;min-height:46px;margin-top:8px">حساب جديد</button>
   </form>
 </div>
 <div class="app">
@@ -235,8 +237,8 @@ a.mbtn[hidden]{display:none}
     <div class="gbar">
       <button class="icon" id="histBtn" type="button" title="سجل الأيام" aria-label="سجل الأيام"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/></svg></button>
       <button class="icon" id="themeBtn" type="button" title="الوضع الليلي" aria-label="الوضع الليلي"><span id="themeIcon"></span></button>
-      <button class="icon" id="gBtn" type="button" title="ربط جوجل شيت" aria-label="ربط جوجل شيت"><svg viewBox="0 0 24 24"><path d="M20 11a8 8 0 10-2.3 5.7M20 4v7h-7"/></svg></button>
-      <a class="icon" id="gOpen" target="_blank" rel="noopener" title="فتح الشيت" aria-label="فتح الشيت" hidden><svg viewBox="0 0 24 24"><path d="M4 5h16v14H4zM4 10h16M10 5v14"/></svg></a>
+      <button class="icon" id="gBtn" type="button" title="مزامنة الآن" aria-label="مزامنة الآن"><svg viewBox="0 0 24 24"><path d="M20 11a8 8 0 10-2.3 5.7M20 4v7h-7"/></svg></button>
+      <button class="icon" id="outBtn" type="button" title="تسجيل الخروج" aria-label="تسجيل الخروج"><svg viewBox="0 0 24 24"><path d="M9 4H5v16h4M16 8l4 4-4 4M20 12H9"/></svg></button>
     </div>
     <div class="owner"><span>المستخدم</span><strong id="ownerEmail" style="overflow-wrap:anywhere">…</strong></div>
   </aside>
@@ -307,7 +309,6 @@ a.mbtn[hidden]{display:none}
   </div>
 </dialog>
 
-<script src="https://accounts.google.com/gsi/client" async defer></script>
 <script>
 (function(){
 "use strict";
@@ -396,13 +397,12 @@ function banner(txt){var b=document.getElementById("banner");if(txt){b.textConte
 function explain(e){
   var m=String((e&&e.message)||e||"").replace(/^Error:\s*/,"");
   if(/[\u0600-\u06FF]/.test(m))return m;
-  if(/authoriz|permission/i.test(m))return "لم تتم الموافقة على صلاحيات الجدول. حدّث الصفحة ووافق عند الطلب.";
-  return "تعذّر الاتصال بجوجل. جرّب التحديث بعد قليل.";
+  return "تعذّر الاتصال بالإنترنت. تبقى تغييراتك على الجهاز وتُرفع لاحقًا.";
 }
 function sync(){
   var t=new Date().toLocaleTimeString("ar-EG",{hour:"2-digit",minute:"2-digit"});
-  if(gLinked()&&gMode===1)setStatus("ok","محفوظ في جوجل شيت · "+t);
-  else if(gLinked())setStatus("err","محفوظ على جهازك · لم يُزامن مع الشيت");
+  if(cTok()&&cMode===1)setStatus("ok","محفوظ في السحابة · "+t);
+  else if(cTok())setStatus("err","محفوظ على جهازك · بانتظار المزامنة");
   else setStatus("ok","محفوظ على جهازك · "+t);
 }
 
@@ -417,7 +417,7 @@ function readData(){
 function saveData(d){
   try{localStorage.setItem(dkey(),JSON.stringify(d))}
   catch(_){throw new Error("تعذّر الحفظ على هذا المتصفح. تأكد أن التخزين غير معطّل.")}
-  gSchedule();
+  cSchedule();
 }
 async function call(name){
   var a=Array.prototype.slice.call(arguments,1), d=readData(), it=d.items, r;
@@ -456,240 +456,68 @@ async function call(name){
   return {ok:true};
 }
 
-/* ===== مزامنة جوجل شيت (اختيارية) ===== */
-var G_CLIENT="557798006694-udf7ercg39sakj456q5cj058l930o2br.apps.googleusercontent.com";
-var G_SCOPE="https://www.googleapis.com/auth/drive.file", G_SCOPE_X="https://www.googleapis.com/auth/spreadsheets";
-var G_ITEMS="الأهداف", G_HIST="السجل";
-var G_HEAD_I=["النوع","الفئة","الوقت اليومي","الهدف الأسبوعي","الكم","الهدف اليومي","السبت","الأحد","الاثنين","الثلاثاء","الأربعاء","الخميس"];
-var G_HEAD_H=["بداية الأسبوع","النوع","الفئة","الوقت اليومي","الهدف الأسبوعي","الهدف اليومي","الكم","السبت","الأحد","الاثنين","الثلاثاء","الأربعاء","الخميس"];
-var gMode=0, gTok=null, gExp=0, gTokScope="", gClient=null, gCb=null, gErrCb=null, gTimer=null, gBusy=false, gAgain=false, gDirty=false;
-function gKey(){return "wk:g:"+user}
-function gFile(){try{return localStorage.getItem(gKey())||""}catch(_){return ""}}
-function gSetFile(v){try{if(v)localStorage.setItem(gKey(),v);else localStorage.removeItem(gKey())}catch(_){}}
-function gDirtySet(v){gDirty=v;try{if(v)localStorage.setItem("wk:gd:"+user,"1");else localStorage.removeItem("wk:gd:"+user)}catch(_){}}
-function gExt(){return gFile().indexOf("x:")===0}
-function gId(){var f=gFile();return gExt()?f.slice(2):f}
-function gLinked(){return !!(user&&gFile())}
-function gUI(){
-  var b=document.getElementById("gBtn"), o=document.getElementById("gOpen");
-  var ok=gTok&&Date.now()<gExp;
-  var t=!gLinked()?"ربط جوجل شيت":(ok?"مزامنة الآن":"إعادة الربط"); b.title=t; b.setAttribute("aria-label",t);
-  var id=gId(); o.hidden=!id; if(id)o.href="https://docs.google.com/spreadsheets/d/"+id+"/edit";
+/* ===== المزامنة مع السحابة (Supabase) ===== */
+var SB_URL="https://hbxjtouharriifpninxp.supabase.co";
+var SB_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhieGp0b3VoYXJyaWlmcG5pbnhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQ4MTc3ODUsImV4cCI6MjExMDM5Mzc4NX0.gGHZkrKQhHUYOsNoCuDbV6GuV-EIntochStBCIyJM5w";
+var cMode=0, cTimer=null, cBusy=false, cAgain=false, cDirty=false, cLastPull=0, cPulling=false;
+function cTok(){try{return localStorage.getItem("wk:tok")||""}catch(_){return ""}}
+function cSetTok(v){try{if(v)localStorage.setItem("wk:tok",v);else localStorage.removeItem("wk:tok")}catch(_){}}
+function cDirtyKey(){return "wk:dirty:"+user}
+function cDirtySet(v){cDirty=v;try{if(v)localStorage.setItem(cDirtyKey(),"1");else localStorage.removeItem(cDirtyKey())}catch(_){}}
+var C_ERR={bad_username:"اسم المستخدم من 3 إلى 40 حرفًا.",bad_password:"كلمة السر من 6 أحرف على الأقل.",user_exists:"اسم المستخدم محجوز، اختر اسمًا آخر أو اضغط «دخول».",bad_credentials:"اسم المستخدم أو كلمة السر غير صحيحة.",locked:"محاولات كثيرة خاطئة. انتظر عشر دقائق ثم أعد المحاولة.",bad_session:"انتهت الجلسة. سجّل الدخول من جديد.",bad_data:"حجم البيانات أكبر من المسموح."};
+async function sbRpc(fn,args){
+  var r=await fetch(SB_URL+"/rest/v1/rpc/"+fn,{method:"POST",headers:{"apikey":SB_KEY,"Authorization":"Bearer "+SB_KEY,"Content-Type":"application/json"},body:JSON.stringify(args)});
+  var j=null; try{j=await r.json()}catch(_){}
+  if(!r.ok){var m=(j&&j.message)||"";var e=new Error(C_ERR[m]||"تعذّر الاتصال بالخادم.");e.code=m;e.http=r.status;throw e}
+  return j;
 }
-function gWait(){
-  return new Promise(function(res,rej){
-    var n=0;(function t(){
-      if(window.google&&google.accounts&&google.accounts.oauth2)return res();
-      if(++n>100)return rej(new Error("تعذّر تحميل خدمة جوجل. تحقق من الاتصال بالإنترنت."));
-      setTimeout(t,100);
-    })();
-  });
+function cEmpty(d){return !(d&&((d.items&&d.items.length)||(d.hist&&d.hist.length)))}
+function cNorm(d){return {items:Array.isArray(d&&d.items)?d.items:[],hist:Array.isArray(d&&d.hist)?d.hist:[]}}
+function cSchedule(){
+  if(!cTok()||!user)return;
+  cDirtySet(true); cMode=2;
+  clearTimeout(cTimer); cTimer=setTimeout(cRun,700);
 }
-async function gToken(interactive){
-  var sc=gExt()?G_SCOPE_X:G_SCOPE;
-  if(gTokScope!==sc){gTok=null;gExp=0;gClient=null;gTokScope=sc}
-  if(gTok&&Date.now()<gExp-60000)return gTok;
-  await gWait();
-  if(!gClient){
-    gClient=google.accounts.oauth2.initTokenClient({
-      client_id:G_CLIENT,scope:sc,
-      callback:function(r){gCb&&gCb(r)},
-      error_callback:function(e){gErrCb&&gErrCb(e)}
-    });
-  }
-  return new Promise(function(res,rej){
-    var done=false, to=setTimeout(function(){if(!done){done=true;rej(new Error("تعذّر الاتصال بجوجل."))}},interactive?120000:8000);
-    gCb=function(r){
-      if(done)return; done=true; clearTimeout(to);
-      if(r&&r.access_token){gTok=r.access_token;gExp=Date.now()+(Number(r.expires_in)||3600)*1000;res(gTok)}
-      else rej(new Error("لم تتم الموافقة على الربط مع جوجل."));
-    };
-    gErrCb=function(){if(done)return;done=true;clearTimeout(to);rej(new Error("لم تتم الموافقة على الربط مع جوجل."))};
-    try{gClient.requestAccessToken({prompt:interactive?"":"none"})}catch(e){done=true;clearTimeout(to);rej(e)}
-  });
-}
-async function gApi(url,opt){
-  var o=opt||{}; o.headers=Object.assign({"Authorization":"Bearer "+gTok},o.headers||{});
-  var r=await fetch(url,o);
-  if(r.status===401){gTok=null;gExp=0;throw new Error("انتهت جلسة جوجل. اضغط «إعادة الربط» من القائمة.")}
-  if(!r.ok){
-    var m="";try{m=(await r.json()).error.message}catch(_){}
-    if(r.status===403&&/not been used|disabled/i.test(m))throw new Error("فعّل Google Sheets API وGoogle Drive API في مشروع Google Cloud.");
-    throw new Error("خطأ من جوجل ("+r.status+")"+(m?": "+m:""));
-  }
-  return r.json();
-}
-function gq(s){return String(s).replace(/\\/g,"\\\\").replace(/'/g,"\\'")}
-async function gFind(){
-  var q="appProperties has { key='wkplanner' and value='"+gq(user)+"' } and trashed=false";
-  var d=await gApi("https://www.googleapis.com/drive/v3/files?fields="+encodeURIComponent("files(id)")+"&q="+encodeURIComponent(q));
-  return d.files&&d.files[0]?d.files[0].id:"";
-}
-async function gCreate(){
-  var sh=await gApi("https://sheets.googleapis.com/v4/spreadsheets",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
-    properties:{title:"الجدول الأسبوعي - "+user,locale:"ar"},
-    sheets:[{properties:{title:G_ITEMS,rightToLeft:true,gridProperties:{frozenRowCount:1}}},{properties:{title:G_HIST,rightToLeft:true,gridProperties:{frozenRowCount:1}}}]
-  })});
-  await gApi("https://www.googleapis.com/drive/v3/files/"+sh.spreadsheetId,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({appProperties:{wkplanner:user}})});
-  return sh.spreadsheetId;
-}
-
-/* ===== شيت موجود بنفس هيكل «جدول الأسبوع» ===== */
-var gMeta={};
-async function gTitles(id){
-  if(gMeta[id])return gMeta[id];
-  var d=await gApi("https://sheets.googleapis.com/v4/spreadsheets/"+id+"?fields=sheets.properties.title");
-  gMeta[id]=d.sheets.map(function(x){return x.properties.title}); return gMeta[id];
-}
-function gNum(v){var n=Number(v);return isFinite(n)?n:0}
-function gNormDate(s){var m=String(s||"").trim().match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);return m?m[1]+"-"+("0"+m[2]).slice(-2)+"-"+("0"+m[3]).slice(-2):""}
-function gBool(v){return v===true||v===1||String(v).toUpperCase()==="TRUE"}
-function gSheetVals(id,ranges){
-  return gApi("https://sheets.googleapis.com/v4/spreadsheets/"+id+"/values:batchGet?valueRenderOption=UNFORMATTED_VALUE&"+ranges.map(function(r){return "ranges="+encodeURIComponent(r)}).join("&"));
-}
-async function gPullX(id){
-  var t=await gTitles(id), tab=t[0], hasH=t.indexOf(G_HIST)>=0;
-  var rs=["'"+tab+"'!A1:M60"]; if(hasH)rs.push("'"+G_HIST+"'!A1:N3000");
-  var d=await gSheetVals(id,rs), a=d.valueRanges[0].values||[], h=hasH?(d.valueRanges[1].values||[]):[];
-  var items=[];
-  for(var r=1;r<a.length;r++){
-    var row=a[r]||[], k=String(row[0]===undefined?"":row[0]).trim();
-    if(!k||k.indexOf("عدد")===0)break;
-    var days=[];for(var i=0;i<6;i++)days.push(gBool(row[6+i]));
-    items.push([k,String(row[1]===undefined?"":row[1]).trim(),gNum(row[2]),gNum(row[3]),String(row[4]===undefined?"":row[4]),gNum(row[5])].concat(days));
-  }
-  var hist=[];
-  for(var q=1;q<h.length;q++){
-    var w=h[q]||[], dt=gNormDate(w[0]); if(!dt)continue;
-    var dd=[];for(var j=0;j<6;j++)dd.push(gBool(w[7+j]));
-    hist.push({date:dt,type:String(w[1]===undefined?"":w[1]).trim(),cls:String(w[2]===undefined?"":w[2]).trim(),time:gNum(w[3]),weekly:gNum(w[4]),daily:gNum(w[5]),qty:String(w[6]===undefined?"":w[6]),days:dd});
-  }
-  return {items:items,hist:hist};
-}
-function gNumSafe(v){return gNum(v)}
-async function gPushX(id){
-  var t=await gTitles(id), tab=t[0], d=readData();
-  var col=await gSheetVals(id,["'"+tab+"'!A1:A60"]), a=col.valueRanges[0].values||[], sum=0;
-  for(var r=1;r<a.length;r++){var k=String((a[r]||[])[0]===undefined?"":a[r][0]).trim();if(k.indexOf("عدد")===0){sum=r+1;break}}
-  var cap=sum?sum-2:58;
-  if(d.items.length>cap)throw new Error("لا توجد صفوف فارغة في الشيت قبل صف الإجمالي. أضف صفوفًا فارغة فوقه ثم حاول مرة أخرى.");
-  var vals=d.items.map(function(v){return v.slice(0,12).map(function(x,i){return i>=6?x===true:x})});
-  while(vals.length<cap)vals.push(["","","","","","",false,false,false,false,false,false]);
-  var base="https://sheets.googleapis.com/v4/spreadsheets/"+id;
-  var upd=[{range:"'"+tab+"'!A2:L"+(cap+1),values:vals}];
-  /* السجل: تُضاف الأسابيع الجديدة فقط */
-  if(d.hist.length){
-    if(t.indexOf(G_HIST)<0){
-      await gApi(base+":batchUpdate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({requests:[{addSheet:{properties:{title:G_HIST,rightToLeft:true,gridProperties:{frozenRowCount:1}}}}]})});
-      gMeta[id]=null;
-      upd.push({range:"'"+G_HIST+"'!A1",values:[G_HEAD_H.concat(["النسبة"])]});
-    }
-    var cur=t.indexOf(G_HIST)<0?[[1]]:((await gSheetVals(id,["'"+G_HIST+"'!A1:N3000"])).valueRanges[0].values||[]);
-    var have={};cur.forEach(function(w,i){if(i>0){var dt=gNormDate((w||[])[0]);if(dt)have[dt]=1}});
-    var rows=d.hist.filter(function(h){return !have[h.date]}).map(function(h){
-      var c=(h.days||[]).filter(Boolean).length, p=h.weekly>0?Math.min(1,h.daily*c/h.weekly):0;
-      return [h.date,h.type,h.cls,h.time,h.weekly,h.daily,h.qty||""].concat((h.days||[]).slice(0,6).map(function(x){return x===true})).concat([p]);
-    });
-    if(rows.length){var st=Math.max(cur.length,1)+1;upd.push({range:"'"+G_HIST+"'!A"+st+":N"+(st+rows.length-1),values:rows})}
-  }
-  await gApi(base+"/values:batchUpdate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({valueInputOption:"RAW",data:upd})});
-}
-async function gPull(id){
-  if(gExt())return gPullX(id);
-  var rs=["'"+G_ITEMS+"'!A2:L200","'"+G_HIST+"'!A2:M5000"];
-  var d=await gApi("https://sheets.googleapis.com/v4/spreadsheets/"+id+"/values:batchGet?valueRenderOption=UNFORMATTED_VALUE&"+rs.map(function(r){return "ranges="+encodeURIComponent(r)}).join("&"));
-  var a=(d.valueRanges[0].values||[]), h=(d.valueRanges[1].values||[]);
-  function days(r,from){var o=[];for(var k=0;k<6;k++)o.push(r[from+k]===true);return o}
-  var items=a.filter(function(r){return r&&r[0]!==undefined&&String(r[0]).trim()!==""}).map(function(r){
-    return [String(r[0]),String(r[1]===undefined?"":r[1]),Number(r[2])||0,Number(r[3])||0,String(r[4]===undefined?"":r[4]),Number(r[5])||0].concat(days(r,6));
-  });
-  var hist=h.filter(function(r){return r&&/^\d{4}-\d{2}-\d{2}$/.test(String(r[0]||""))}).map(function(r){
-    return {date:String(r[0]),type:String(r[1]===undefined?"":r[1]),cls:String(r[2]===undefined?"":r[2]),time:Number(r[3])||0,weekly:Number(r[4])||0,daily:Number(r[5])||0,qty:String(r[6]===undefined?"":r[6]),days:days(r,7)};
-  });
-  return {items:items,hist:hist};
-}
-async function gPushNow(){
-  var id=gId(); if(!id)return;
-  if(gExt())return gPushX(id);
-  var d=readData();
-  var vi=[G_HEAD_I].concat(d.items.map(function(v){return v.slice(0,12).map(function(x,i){return i>=6?x===true:x})}));
-  var vh=[G_HEAD_H].concat(d.hist.map(function(h){return [h.date,h.type,h.cls,h.time,h.weekly,h.daily,h.qty||""].concat((h.days||[]).slice(0,6).map(function(x){return x===true}))}));
-  var base="https://sheets.googleapis.com/v4/spreadsheets/"+id+"/values";
-  await gApi(base+":batchClear",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({ranges:["'"+G_ITEMS+"'!A:L","'"+G_HIST+"'!A:M"]})});
-  await gApi(base+":batchUpdate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({valueInputOption:"RAW",data:[{range:"'"+G_ITEMS+"'!A1",values:vi},{range:"'"+G_HIST+"'!A1",values:vh}]})});
-}
-function gSchedule(){
-  if(!gLinked())return;
-  gDirtySet(true); gMode=2;
-  clearTimeout(gTimer); gTimer=setTimeout(gRun,800);
-}
-async function gRun(){
-  if(gBusy){gAgain=true;return}
-  gBusy=true;
+async function cRun(){
+  cTimer=null;
+  if(cBusy){cAgain=true;return}
+  if(!cTok())return;
+  cBusy=true;
   try{
     do{
-      gAgain=false;
-      await gToken(false);
-      await gPushNow();
-      if(!gAgain)gDirtySet(false); gMode=1;
-    }while(gAgain);
-  }catch(e){gMode=2; if(!gTok||Date.now()>=gExp)gNeedAuth=true; var m=String((e&&e.message)||""); if(/[\u0600-\u06FF]/.test(m))banner(m)}
-  gBusy=false; if(gMode===1)gNeedAuth=false; sync(); gUI();
-}
-/* ربط أو إعادة ربط أو سحب من الشيت */
-async function gConnect(interactive,noCreate){
-  await gToken(interactive);
-  var id=gId(), created=false;
-  if(!id){id=await gFind(); if(id)gSetFile(id)}
-  if(!id&&noCreate)throw new Error("لم أجد ملفًا باسم «"+user+"» في حساب جوجل هذا. اكتب الاسم نفسه الذي استخدمته أول مرة، وتأكد أنك اخترت الحساب نفسه.");
-  if(!id){id=await gCreate();gSetFile(id);created=true}
-  var local=readData(), msg="";
-  if(created||gDirty){await gPushNow();gDirtySet(false);msg=created?"تم إنشاء ملف جوجل شيت وحفظ بياناتك فيه.":""}
-  else{
-    var rem=await gPull(id);
-    if(rem.items.length||rem.hist.length){
-      if(local.items.length||local.hist.length){try{localStorage.setItem("wk:bak:"+user,JSON.stringify(local))}catch(_){}}
-      try{localStorage.setItem(dkey(),JSON.stringify(rem))}catch(_){}
-      msg="تم تحميل بياناتك من جوجل شيت.";
-    }else if(!gExt()){await gPushNow()}
+      cAgain=false;
+      await sbRpc("wk_save",{p_token:cTok(),p_data:readData()});
+      if(!cAgain)cDirtySet(false); cMode=1;
+    }while(cAgain);
+  }catch(e){
+    cMode=2;
+    if(e.code==="bad_session"){cSetTok("");cBusy=false;showLogin();document.getElementById("loginErr").textContent=C_ERR.bad_session;return}
   }
-  gMode=1; gUI();
-  return msg;
+  cBusy=false; sync();
 }
-/* مزامنة تلقائية */
-var gNeedAuth=false, gPulling=false, gLastPull=0;
-async function gAutoPull(){
-  if(!gLinked()||gPulling||gBusy||gDirty||pending>0||gTimer)return;
-  if(Date.now()-gLastPull<20000)return;
-  gPulling=true; gLastPull=Date.now();
+/* سحب من السحابة: يستبدل المحلي إن لم تكن هناك تغييرات معلّقة */
+async function cPull(force){
+  if(!cTok()||!user||cPulling||cBusy||pending>0)return;
+  if(!force&&(cTimer||Date.now()-cLastPull<20000))return;
+  if(cDirty){await cRun();return}
+  cPulling=true; cLastPull=Date.now();
   try{
-    await gToken(false);
-    var rem=await gPull(gId()), loc=readData();
-    if((rem.items.length||rem.hist.length)&&JSON.stringify(rem)!==JSON.stringify(loc)&&!gDirty&&pending===0){
+    var r=await sbRpc("wk_load",{p_token:cTok()}), rem=cNorm(r.data), loc=readData();
+    if(cEmpty(rem)&&!cEmpty(loc)){cSchedule()}
+    else if(JSON.stringify(rem)!==JSON.stringify(loc)&&!cDirty&&pending===0){
       localStorage.setItem(dkey(),JSON.stringify(rem)); await load();
     }
-    gMode=1; gNeedAuth=false; sync(); gUI();
-  }catch(e){gNeedAuth=true}
-  gPulling=false;
+    cMode=1; sync();
+  }catch(e){
+    cMode=2;
+    if(e.code==="bad_session"){cSetTok("");showLogin();document.getElementById("loginErr").textContent=C_ERR.bad_session}
+    else sync();
+  }
+  cPulling=false;
 }
-document.addEventListener("visibilitychange",function(){if(!document.hidden)gAutoPull()});
-window.addEventListener("online",function(){if(gDirty)gSchedule();else gAutoPull()});
-setInterval(function(){if(!document.hidden)gAutoPull()},120000);
-/* إن انتهت الجلسة: أول لمسة تجدّد الربط تلقائيًا */
-document.addEventListener("click",function(e){
-  if(!gNeedAuth||!gLinked()||gBusy||gPulling)return;
-  if(e.target.closest&&e.target.closest("#gBtn"))return;
-  gNeedAuth=false;
-  gConnect(true).then(function(){return load()}).catch(function(){gNeedAuth=true});
-},true);
-
-async function gStart(){
-  if(!gLinked()){gUI();return}
-  try{gDirty=localStorage.getItem("wk:gd:"+user)==="1"}catch(_){}
-  try{await gConnect(false); await load(); sync()}
-  catch(e){gMode=2; if(!gTok||Date.now()>=gExp)gNeedAuth=true; sync()}
-  gUI();
-}
+document.addEventListener("visibilitychange",function(){if(!document.hidden)cPull(false)});
+window.addEventListener("online",function(){if(cDirty)cSchedule();else cPull(true)});
+setInterval(function(){if(!document.hidden)cPull(false)},120000);
 
 function setAccount(d){
   if(d.email)document.getElementById("ownerEmail").textContent=d.email;
@@ -953,38 +781,49 @@ document.addEventListener("touchend",function(e){
   sx=null; mode=null;
 },{passive:true});
 
-/* الدخول بالاسم */
-var loginEl=document.getElementById("login"), nameIn=document.getElementById("uName");
+/* الدخول */
+var loginEl=document.getElementById("login"), nameIn=document.getElementById("uName"), passIn=document.getElementById("uPass"), loginErr=document.getElementById("loginErr");
 function showLogin(){
-  user=null; items=[]; render(); banner("");
-  loginEl.hidden=false; nameIn.value=""; setTimeout(function(){nameIn.focus()},50);
+  user=null; items=[]; render(); banner(""); cMode=0;
+  try{localStorage.removeItem("wk:last")}catch(_){}
+  loginEl.hidden=false; passIn.value=""; setTimeout(function(){nameIn.focus()},50);
 }
-async function doLogin(){
-  var n=nameIn.value.trim().replace(/\s+/g," ");
-  if(!n){document.getElementById("loginErr").textContent="اكتب اسمك أولًا.";return}
-  user=n; try{localStorage.setItem("wk:last",n)}catch(_){}
-  loginEl.hidden=true; document.getElementById("loginErr").textContent="";
-  gMode=0; gDirty=false; await load(); gStart();
-}
-document.getElementById("loginBtn").addEventListener("click",doLogin);
-document.getElementById("restoreBtn").addEventListener("click",async function(){
-  var n=nameIn.value.trim().replace(/\s+/g," "), er=document.getElementById("loginErr");
-  if(!n){er.textContent="اكتب اسمك أولًا.";return}
-  user=n; er.textContent="جارٍ الاتصال بجوجل…";
+var authBusy=false;
+async function doAuth(signup){
+  if(authBusy)return;
+  var n=nameIn.value.trim().replace(/\s+/g," ").toLowerCase(), p=passIn.value;
+  if(!n||!p){loginErr.textContent="اكتب اسم المستخدم وكلمة السر.";return}
+  authBusy=true; loginErr.textContent="جارٍ الاتصال…";
   try{
-    await gConnect(true,true);
-    try{localStorage.setItem("wk:last",n)}catch(_){}
-    loginEl.hidden=true; er.textContent=""; await load(); gUI();
-  }catch(e){user=null; er.textContent=explain(e)}
-});
-nameIn.addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();doLogin()}});
+    var r=await sbRpc(signup?"wk_signup":"wk_login",{p_user:n,p_pass:p});
+    if(r&&r.error)throw Object.assign(new Error(C_ERR[r.error]||"تعذّر الدخول."),{code:r.error});
+    user=r.username; cSetTok(r.token);
+    try{localStorage.setItem("wk:last",user)}catch(_){}
+    var rem=cNorm(r.data), loc=readData();
+    cDirty=false; try{cDirty=localStorage.getItem(cDirtyKey())==="1"}catch(_){}
+    if(cEmpty(rem)&&!cEmpty(loc)){cDirty=true;cSchedule()}  /* بيانات سابقة على الجهاز تُرفع لحسابك */
+    else if(!cDirty){saveLocalOnly(rem)}
+    else cSchedule();
+    cMode=1; passIn.value=""; loginErr.textContent=""; loginEl.hidden=true;
+    await load(); sync();
+  }catch(e){loginErr.textContent=explain(e)}
+  authBusy=false;
+}
+function saveLocalOnly(d){try{localStorage.setItem(dkey(),JSON.stringify(d))}catch(_){}}
+document.getElementById("loginBtn").addEventListener("click",function(){doAuth(false)});
+document.getElementById("signupBtn").addEventListener("click",function(){doAuth(true)});
+[nameIn,passIn].forEach(function(el){el.addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();doAuth(false)}})});
 document.getElementById("gBtn").addEventListener("click",async function(){
+  setDrawer(false); setStatus("busy","جارٍ المزامنة…"); banner("");
+  if(cDirty)await cRun(); else await cPull(true);
+  sync();
+});
+document.getElementById("outBtn").addEventListener("click",async function(){
   setDrawer(false);
-  setStatus("busy","جارٍ الربط مع جوجل…");
-  try{
-    var m=await gConnect(true);
-    await load(); banner(""); if(m){banner(m)}
-  }catch(e){gMode=2;sync();gUI();banner(explain(e))}
+  if(cDirty&&cTok()){try{await cRun()}catch(_){}}
+  var t=cTok(); cSetTok("");
+  if(t){try{await sbRpc("wk_logout",{p_token:t})}catch(_){}}
+  showLogin();
 });
 /* أحداث القائمة الرئيسية */
 document.addEventListener("click",function(e){
@@ -1013,7 +852,7 @@ setStatus("","جارٍ التحميل…");
 mcp=true;
 (async function(){
   var last=null; try{last=localStorage.getItem("wk:last")}catch(_){}
-  if(last){user=last;await load();gStart()}
+  if(last&&cTok()){user=last;try{cDirty=localStorage.getItem(cDirtyKey())==="1"}catch(_){}await load();cPull(true)}
   else{showLogin()}
   document.getElementById("splash").hidden=true;
 })();
