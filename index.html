@@ -252,7 +252,6 @@ a.mbtn[hidden]{display:none}
     <div class="gbar">
       <button class="icon" id="histBtn" type="button" title="سجل الأيام" aria-label="سجل الأيام"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/></svg></button>
       <button class="icon" id="themeBtn" type="button" title="الوضع الليلي" aria-label="الوضع الليلي"><span id="themeIcon"></span></button>
-      <button class="icon" id="gBtn" type="button" title="مزامنة الآن" aria-label="مزامنة الآن"><svg viewBox="0 0 24 24"><path d="M20 11a8 8 0 10-2.3 5.7M20 4v7h-7"/></svg></button>
       <button class="icon" id="keyBtn" type="button" title="رمز استرجاع جديد" aria-label="رمز استرجاع جديد"><svg viewBox="0 0 24 24"><circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M16 7l3 3M14 9l2 2"/></svg></button>
       <button class="icon" id="outBtn" type="button" title="تسجيل الخروج" aria-label="تسجيل الخروج"><svg viewBox="0 0 24 24"><path d="M9 4H5v16h4M16 8l4 4-4 4M20 12H9"/></svg></button>
     </div>
@@ -856,11 +855,6 @@ document.getElementById("keyBtn").addEventListener("click",async function(){
   setDrawer(false);
   try{var r=await sbRpc("wk_new_recovery",{p_token:cTok()});showRecovery(r.recovery,"رمز استرجاع جديد (السابق لم يعد صالحًا)")}
   catch(e){banner(explain(e))}
-});
-document.getElementById("gBtn").addEventListener("click",async function(){
-  setDrawer(false); setStatus("busy","جارٍ المزامنة…"); banner("");
-  if(cDirty)await cRun(); else await cPull(true);
-  sync();
 });
 document.getElementById("outBtn").addEventListener("click",async function(){
   setDrawer(false);
