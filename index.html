@@ -204,6 +204,16 @@ a.mbtn[hidden]{display:none}
     <button type="button" class="btn primary" id="loginBtn" style="width:100%;min-height:46px">دخول</button>
   </form>
 </div>
+<dialog id="xDlg">
+  <strong>ربط شيت موجود</strong>
+  <p style="margin:8px 0">الصق رابط ملف جوجل شيت الذي بهيكل «جدول الأسبوع» (الأهداف في الصفوف من 2 فصاعدًا، وصف «عدد…» في آخرها). سيطلب جوجل صلاحية تعديل جداول البيانات، فسجّل الدخول بالحساب الذي يملك الملف.</p>
+  <input id="xUrl" placeholder="https://docs.google.com/spreadsheets/d/…" dir="ltr" style="width:100%;font:inherit;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink)">
+  <div class="err2" id="xErr" role="alert"></div>
+  <div class="acts">
+    <button class="btn" id="xNo" type="button">إلغاء</button>
+    <button class="btn primary" id="xYes" type="button">ربط</button>
+  </div>
+</dialog>
 <input type="file" id="impFile" accept="application/json,.json" hidden>
 <dialog id="impDlg">
   <strong>استيراد نسخة احتياطية؟</strong>
@@ -226,6 +236,7 @@ a.mbtn[hidden]{display:none}
       
       <button class="mbtn" id="gBtn" type="button"><svg viewBox="0 0 24 24"><path d="M4 5h16v14H4zM4 10h16M10 5v14"/></svg>ربط جوجل شيت</button>
       <a class="mbtn" id="gOpen" target="_blank" rel="noopener" hidden><svg viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9M18 14v6H4V6h6"/></svg>فتح الشيت</a>
+      <button class="mbtn" id="gX" type="button"><svg viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>ربط شيت موجود</button>
       <button class="mbtn" id="gOff" type="button" hidden><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>فصل الربط</button>
       <button class="mbtn" id="exportBtn" type="button"><svg viewBox="0 0 24 24"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>تصدير نسخة احتياطية</button>
       <button class="mbtn" id="importBtn" type="button"><svg viewBox="0 0 24 24"><path d="M12 15V4M7 9l5-5 5 5M5 20h14"/></svg>استيراد نسخة</button>
@@ -459,21 +470,23 @@ async function call(name){
 
 /* ===== مزامنة جوجل شيت (اختيارية) ===== */
 var G_CLIENT="557798006694-udf7ercg39sakj456q5cj058l930o2br.apps.googleusercontent.com";
-var G_SCOPE="https://www.googleapis.com/auth/drive.file";
+var G_SCOPE="https://www.googleapis.com/auth/drive.file", G_SCOPE_X="https://www.googleapis.com/auth/spreadsheets";
 var G_ITEMS="الأهداف", G_HIST="السجل";
 var G_HEAD_I=["النوع","الفئة","الوقت اليومي","الهدف الأسبوعي","الكم","الهدف اليومي","السبت","الأحد","الاثنين","الثلاثاء","الأربعاء","الخميس"];
 var G_HEAD_H=["بداية الأسبوع","النوع","الفئة","الوقت اليومي","الهدف الأسبوعي","الهدف اليومي","الكم","السبت","الأحد","الاثنين","الثلاثاء","الأربعاء","الخميس"];
-var gMode=0, gTok=null, gExp=0, gClient=null, gCb=null, gErrCb=null, gTimer=null, gBusy=false, gAgain=false, gDirty=false;
+var gMode=0, gTok=null, gExp=0, gTokScope="", gClient=null, gCb=null, gErrCb=null, gTimer=null, gBusy=false, gAgain=false, gDirty=false;
 function gKey(){return "wk:g:"+user}
 function gFile(){try{return localStorage.getItem(gKey())||""}catch(_){return ""}}
 function gSetFile(v){try{if(v)localStorage.setItem(gKey(),v);else localStorage.removeItem(gKey())}catch(_){}}
 function gDirtySet(v){gDirty=v;try{if(v)localStorage.setItem("wk:gd:"+user,"1");else localStorage.removeItem("wk:gd:"+user)}catch(_){}}
+function gExt(){return gFile().indexOf("x:")===0}
+function gId(){var f=gFile();return gExt()?f.slice(2):f}
 function gLinked(){return !!(user&&gFile())}
 function gUI(){
   var b=document.getElementById("gBtn"), o=document.getElementById("gOpen"), f=document.getElementById("gOff");
   var ok=gTok&&Date.now()<gExp;
   b.lastChild.textContent=!gLinked()?"ربط جوجل شيت":(ok?"مزامنة الآن":"إعادة الربط");
-  var id=gFile(); o.hidden=!id; if(id)o.href="https://docs.google.com/spreadsheets/d/"+id+"/edit";
+  var id=gId(); o.hidden=!id; if(id)o.href="https://docs.google.com/spreadsheets/d/"+id+"/edit";
   f.hidden=!gLinked();
 }
 function gWait(){
@@ -486,11 +499,13 @@ function gWait(){
   });
 }
 async function gToken(interactive){
+  var sc=gExt()?G_SCOPE_X:G_SCOPE;
+  if(gTokScope!==sc){gTok=null;gExp=0;gClient=null;gTokScope=sc}
   if(gTok&&Date.now()<gExp-60000)return gTok;
   await gWait();
   if(!gClient){
     gClient=google.accounts.oauth2.initTokenClient({
-      client_id:G_CLIENT,scope:G_SCOPE,
+      client_id:G_CLIENT,scope:sc,
       callback:function(r){gCb&&gCb(r)},
       error_callback:function(e){gErrCb&&gErrCb(e)}
     });
@@ -531,7 +546,69 @@ async function gCreate(){
   await gApi("https://www.googleapis.com/drive/v3/files/"+sh.spreadsheetId,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({appProperties:{wkplanner:user}})});
   return sh.spreadsheetId;
 }
+
+/* ===== شيت موجود بنفس هيكل «جدول الأسبوع» ===== */
+var gMeta={};
+async function gTitles(id){
+  if(gMeta[id])return gMeta[id];
+  var d=await gApi("https://sheets.googleapis.com/v4/spreadsheets/"+id+"?fields=sheets.properties.title");
+  gMeta[id]=d.sheets.map(function(x){return x.properties.title}); return gMeta[id];
+}
+function gNum(v){var n=Number(v);return isFinite(n)?n:0}
+function gNormDate(s){var m=String(s||"").trim().match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);return m?m[1]+"-"+("0"+m[2]).slice(-2)+"-"+("0"+m[3]).slice(-2):""}
+function gBool(v){return v===true||v===1||String(v).toUpperCase()==="TRUE"}
+function gSheetVals(id,ranges){
+  return gApi("https://sheets.googleapis.com/v4/spreadsheets/"+id+"/values:batchGet?valueRenderOption=UNFORMATTED_VALUE&"+ranges.map(function(r){return "ranges="+encodeURIComponent(r)}).join("&"));
+}
+async function gPullX(id){
+  var t=await gTitles(id), tab=t[0], hasH=t.indexOf(G_HIST)>=0;
+  var rs=["'"+tab+"'!A1:M60"]; if(hasH)rs.push("'"+G_HIST+"'!A1:N3000");
+  var d=await gSheetVals(id,rs), a=d.valueRanges[0].values||[], h=hasH?(d.valueRanges[1].values||[]):[];
+  var items=[];
+  for(var r=1;r<a.length;r++){
+    var row=a[r]||[], k=String(row[0]===undefined?"":row[0]).trim();
+    if(!k||k.indexOf("عدد")===0)break;
+    var days=[];for(var i=0;i<6;i++)days.push(gBool(row[6+i]));
+    items.push([k,String(row[1]===undefined?"":row[1]).trim(),gNum(row[2]),gNum(row[3]),String(row[4]===undefined?"":row[4]),gNum(row[5])].concat(days));
+  }
+  var hist=[];
+  for(var q=1;q<h.length;q++){
+    var w=h[q]||[], dt=gNormDate(w[0]); if(!dt)continue;
+    var dd=[];for(var j=0;j<6;j++)dd.push(gBool(w[7+j]));
+    hist.push({date:dt,type:String(w[1]===undefined?"":w[1]).trim(),cls:String(w[2]===undefined?"":w[2]).trim(),time:gNum(w[3]),weekly:gNum(w[4]),daily:gNum(w[5]),qty:String(w[6]===undefined?"":w[6]),days:dd});
+  }
+  return {items:items,hist:hist};
+}
+function gNumSafe(v){return gNum(v)}
+async function gPushX(id){
+  var t=await gTitles(id), tab=t[0], d=readData();
+  var col=await gSheetVals(id,["'"+tab+"'!A1:A60"]), a=col.valueRanges[0].values||[], sum=0;
+  for(var r=1;r<a.length;r++){var k=String((a[r]||[])[0]===undefined?"":a[r][0]).trim();if(k.indexOf("عدد")===0){sum=r+1;break}}
+  var cap=sum?sum-2:58;
+  if(d.items.length>cap)throw new Error("لا توجد صفوف فارغة في الشيت قبل صف الإجمالي. أضف صفوفًا فارغة فوقه ثم حاول مرة أخرى.");
+  var vals=d.items.map(function(v){return v.slice(0,12).map(function(x,i){return i>=6?x===true:x})});
+  while(vals.length<cap)vals.push(["","","","","","",false,false,false,false,false,false]);
+  var base="https://sheets.googleapis.com/v4/spreadsheets/"+id;
+  var upd=[{range:"'"+tab+"'!A2:L"+(cap+1),values:vals}];
+  /* السجل: تُضاف الأسابيع الجديدة فقط */
+  if(d.hist.length){
+    if(t.indexOf(G_HIST)<0){
+      await gApi(base+":batchUpdate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({requests:[{addSheet:{properties:{title:G_HIST,rightToLeft:true,gridProperties:{frozenRowCount:1}}}}]})});
+      gMeta[id]=null;
+      upd.push({range:"'"+G_HIST+"'!A1",values:[G_HEAD_H.concat(["النسبة"])]});
+    }
+    var cur=t.indexOf(G_HIST)<0?[[1]]:((await gSheetVals(id,["'"+G_HIST+"'!A1:N3000"])).valueRanges[0].values||[]);
+    var have={};cur.forEach(function(w,i){if(i>0){var dt=gNormDate((w||[])[0]);if(dt)have[dt]=1}});
+    var rows=d.hist.filter(function(h){return !have[h.date]}).map(function(h){
+      var c=(h.days||[]).filter(Boolean).length, p=h.weekly>0?Math.min(1,h.daily*c/h.weekly):0;
+      return [h.date,h.type,h.cls,h.time,h.weekly,h.daily,h.qty||""].concat((h.days||[]).slice(0,6).map(function(x){return x===true})).concat([p]);
+    });
+    if(rows.length){var st=Math.max(cur.length,1)+1;upd.push({range:"'"+G_HIST+"'!A"+st+":N"+(st+rows.length-1),values:rows})}
+  }
+  await gApi(base+"/values:batchUpdate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({valueInputOption:"RAW",data:upd})});
+}
 async function gPull(id){
+  if(gExt())return gPullX(id);
   var rs=["'"+G_ITEMS+"'!A2:L200","'"+G_HIST+"'!A2:M5000"];
   var d=await gApi("https://sheets.googleapis.com/v4/spreadsheets/"+id+"/values:batchGet?valueRenderOption=UNFORMATTED_VALUE&"+rs.map(function(r){return "ranges="+encodeURIComponent(r)}).join("&"));
   var a=(d.valueRanges[0].values||[]), h=(d.valueRanges[1].values||[]);
@@ -545,7 +622,8 @@ async function gPull(id){
   return {items:items,hist:hist};
 }
 async function gPushNow(){
-  var id=gFile(); if(!id)return;
+  var id=gId(); if(!id)return;
+  if(gExt())return gPushX(id);
   var d=readData();
   var vi=[G_HEAD_I].concat(d.items.map(function(v){return v.slice(0,12).map(function(x,i){return i>=6?x===true:x})}));
   var vh=[G_HEAD_H].concat(d.hist.map(function(h){return [h.date,h.type,h.cls,h.time,h.weekly,h.daily,h.qty||""].concat((h.days||[]).slice(0,6).map(function(x){return x===true}))}));
@@ -568,15 +646,14 @@ async function gRun(){
       await gPushNow();
       if(!gAgain)gDirtySet(false); gMode=1;
     }while(gAgain);
-  }catch(e){gMode=2}
+  }catch(e){gMode=2; var m=String((e&&e.message)||""); if(/[\u0600-\u06FF]/.test(m))banner(m)}
   gBusy=false; sync(); gUI();
 }
 /* ربط أو إعادة ربط أو سحب من الشيت */
 async function gConnect(interactive){
   await gToken(interactive);
-  var id=gFile();
+  var id=gId(), created=false;
   if(!id){id=await gFind(); if(id)gSetFile(id)}
-  var created=false;
   if(!id){id=await gCreate();gSetFile(id);created=true}
   var local=readData(), msg="";
   if(created||gDirty){await gPushNow();gDirtySet(false);msg=created?"تم إنشاء ملف جوجل شيت وحفظ بياناتك فيه.":""}
@@ -586,7 +663,7 @@ async function gConnect(interactive){
       if(local.items.length||local.hist.length){try{localStorage.setItem("wk:bak:"+user,JSON.stringify(local))}catch(_){}}
       try{localStorage.setItem(dkey(),JSON.stringify(rem))}catch(_){}
       msg="تم تحميل بياناتك من جوجل شيت.";
-    }else{await gPushNow()}
+    }else if(!gExt()){await gPushNow()}
   }
   gMode=1; gUI();
   return msg;
@@ -884,6 +961,17 @@ document.getElementById("gBtn").addEventListener("click",async function(){
     var m=await gConnect(true);
     await load(); banner(""); if(m){banner(m)}
   }catch(e){gMode=2;sync();gUI();banner(explain(e))}
+});
+var xDlg=document.getElementById("xDlg");
+document.getElementById("gX").addEventListener("click",fromMenu(function(){document.getElementById("xErr").textContent="";document.getElementById("xUrl").value="";xDlg.showModal()}));
+document.getElementById("xNo").addEventListener("click",function(){xDlg.close()});
+document.getElementById("xYes").addEventListener("click",async function(){
+  var u=document.getElementById("xUrl").value.trim(), m=u.match(/\/d\/([a-zA-Z0-9_-]{20,})/)||u.match(/^([a-zA-Z0-9_-]{25,})$/);
+  if(!m){document.getElementById("xErr").textContent="الرابط غير صحيح. انسخه من شريط العنوان وهو مفتوح على الشيت.";return}
+  xDlg.close(); setStatus("busy","جارٍ الربط مع الشيت…");
+  var prior=gFile(); gSetFile("x:"+m[1]); gTok=null; gExp=0; gDirtySet(false);
+  try{var msg=await gConnect(true); await load(); banner(msg||"تم الربط بالشيت."); gUI()}
+  catch(e){gSetFile(prior); gMode=prior?2:0; sync(); gUI(); banner(explain(e))}
 });
 document.getElementById("gOff").addEventListener("click",fromMenu(function(){
   gSetFile(""); gMode=0; gDirtySet(false); sync(); gUI(); banner("تم فصل الربط. بياناتك باقية على الجهاز وفي الشيت.");
