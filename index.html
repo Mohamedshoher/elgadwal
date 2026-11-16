@@ -142,6 +142,10 @@ form.add input:focus{border-color:var(--accent)}
 .lcard h2{font-family:var(--font-display);font-size:28px;margin:0 0 6px}
 .lcard p{color:var(--muted);margin:0 0 16px;line-height:1.7;font-size:15px}
 .lcard input+input{margin-top:0}
+.lcard input[hidden]{display:none}
+.linkbtn{background:none;border:0;color:var(--accent);margin-top:12px;font-size:14px;text-decoration:underline;padding:6px}
+.reccode{direction:ltr;font-family:ui-monospace,Consolas,monospace;font-size:24px;letter-spacing:2px;text-align:center;padding:14px 8px;border:1px dashed var(--accent);border-radius:12px;background:var(--accent-soft);user-select:all;margin:12px 0}
+.gbar{flex-wrap:wrap}
 .lcard input{font:inherit;font-size:17px;width:100%;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--bg);color:var(--ink);text-align:center;margin-bottom:6px}
 .lcard input:focus{border-color:var(--accent)}
 #splash{position:fixed;inset:0;z-index:100;background:var(--bg);display:flex;align-items:center;justify-content:center;text-align:center;color:var(--muted)}
@@ -212,12 +216,23 @@ a.mbtn[hidden]{display:none}
     <h2>الجدول الأسبوعي</h2>
     <p>سجّل الدخول لتظهر أهدافك على كل أجهزتك.</p>
     <input id="uName" autocomplete="username" placeholder="اسم المستخدم" maxlength="40" aria-label="اسم المستخدم" autocapitalize="none">
+    <input id="uCode" placeholder="رمز الاسترجاع (XXXX-XXXX-XXXX)" maxlength="20" dir="ltr" autocapitalize="characters" aria-label="رمز الاسترجاع" hidden>
     <input id="uPass" type="password" autocomplete="current-password" placeholder="كلمة السر" maxlength="100" aria-label="كلمة السر">
     <div class="err2" id="loginErr" role="alert"></div>
     <button type="button" class="btn primary" id="loginBtn" style="width:100%;min-height:46px">دخول</button>
     <button type="button" class="btn" id="signupBtn" style="width:100%;min-height:46px;margin-top:8px">حساب جديد</button>
+    <button type="button" class="linkbtn" id="forgotBtn">نسيت كلمة السر؟</button>
   </form>
 </div>
+<dialog id="recDlg">
+  <strong id="recTitle">رمز الاسترجاع</strong>
+  <p style="margin:8px 0 0;line-height:1.8">احفظ هذا الرمز في مكان آمن (صوّره أو اكتبه). إن نسيت كلمة السر فهو الطريقة الوحيدة لاستعادة حسابك. يظهر مرة واحدة ويُستعمل مرة واحدة.</p>
+  <div class="reccode" id="recCode"></div>
+  <div class="acts">
+    <button class="btn" id="recCopy" type="button">نسخ</button>
+    <button class="btn primary" id="recOk" type="button">حفظته</button>
+  </div>
+</dialog>
 <div class="app">
   <aside class="drawer" id="drawer" aria-label="القائمة الجانبية">
     <div class="dhead">
@@ -238,6 +253,7 @@ a.mbtn[hidden]{display:none}
       <button class="icon" id="histBtn" type="button" title="سجل الأيام" aria-label="سجل الأيام"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/></svg></button>
       <button class="icon" id="themeBtn" type="button" title="الوضع الليلي" aria-label="الوضع الليلي"><span id="themeIcon"></span></button>
       <button class="icon" id="gBtn" type="button" title="مزامنة الآن" aria-label="مزامنة الآن"><svg viewBox="0 0 24 24"><path d="M20 11a8 8 0 10-2.3 5.7M20 4v7h-7"/></svg></button>
+      <button class="icon" id="keyBtn" type="button" title="رمز استرجاع جديد" aria-label="رمز استرجاع جديد"><svg viewBox="0 0 24 24"><circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M16 7l3 3M14 9l2 2"/></svg></button>
       <button class="icon" id="outBtn" type="button" title="تسجيل الخروج" aria-label="تسجيل الخروج"><svg viewBox="0 0 24 24"><path d="M9 4H5v16h4M16 8l4 4-4 4M20 12H9"/></svg></button>
     </div>
     <div class="owner"><span>المستخدم</span><strong id="ownerEmail" style="overflow-wrap:anywhere">…</strong></div>
@@ -464,7 +480,7 @@ function cTok(){try{return localStorage.getItem("wk:tok")||""}catch(_){return ""
 function cSetTok(v){try{if(v)localStorage.setItem("wk:tok",v);else localStorage.removeItem("wk:tok")}catch(_){}}
 function cDirtyKey(){return "wk:dirty:"+user}
 function cDirtySet(v){cDirty=v;try{if(v)localStorage.setItem(cDirtyKey(),"1");else localStorage.removeItem(cDirtyKey())}catch(_){}}
-var C_ERR={bad_username:"اسم المستخدم من 3 إلى 40 حرفًا.",bad_password:"كلمة السر من 6 أحرف على الأقل.",user_exists:"اسم المستخدم محجوز، اختر اسمًا آخر أو اضغط «دخول».",bad_credentials:"اسم المستخدم أو كلمة السر غير صحيحة.",locked:"محاولات كثيرة خاطئة. انتظر عشر دقائق ثم أعد المحاولة.",bad_session:"انتهت الجلسة. سجّل الدخول من جديد.",bad_data:"حجم البيانات أكبر من المسموح."};
+var C_ERR={bad_username:"اسم المستخدم من 3 إلى 40 حرفًا.",bad_password:"كلمة السر من 6 أحرف على الأقل.",user_exists:"اسم المستخدم محجوز، اختر اسمًا آخر أو اضغط «دخول».",bad_credentials:"اسم المستخدم أو كلمة السر غير صحيحة.",locked:"محاولات كثيرة خاطئة. انتظر عشر دقائق ثم أعد المحاولة.",bad_session:"انتهت الجلسة. سجّل الدخول من جديد.",bad_data:"حجم البيانات أكبر من المسموح.",bad_recovery:"رمز الاسترجاع أو اسم المستخدم غير صحيح.",full:"التسجيل مغلق مؤقتًا. تواصل مع صاحب التطبيق."};
 async function sbRpc(fn,args){
   var r=await fetch(SB_URL+"/rest/v1/rpc/"+fn,{method:"POST",headers:{"apikey":SB_KEY,"Authorization":"Bearer "+SB_KEY,"Content-Type":"application/json"},body:JSON.stringify(args)});
   var j=null; try{j=await r.json()}catch(_){}
@@ -788,14 +804,36 @@ function showLogin(){
   try{localStorage.removeItem("wk:last")}catch(_){}
   loginEl.hidden=false; passIn.value=""; setTimeout(function(){nameIn.focus()},50);
 }
-var authBusy=false;
+var authBusy=false, resetMode=false, codeIn=document.getElementById("uCode");
+function setResetMode(on){
+  resetMode=on; codeIn.hidden=!on; codeIn.value="";
+  passIn.placeholder=on?"كلمة السر الجديدة":"كلمة السر";
+  passIn.setAttribute("autocomplete",on?"new-password":"current-password");
+  document.getElementById("loginBtn").textContent=on?"تعيين كلمة سر جديدة":"دخول";
+  document.getElementById("signupBtn").hidden=on;
+  document.getElementById("forgotBtn").textContent=on?"رجوع":"نسيت كلمة السر؟";
+  loginErr.textContent="";
+}
+document.getElementById("forgotBtn").addEventListener("click",function(){setResetMode(!resetMode)});
+var recDlg=document.getElementById("recDlg");
+function showRecovery(code,title){
+  document.getElementById("recTitle").textContent=title||"رمز الاسترجاع";
+  document.getElementById("recCode").textContent=code; recDlg.showModal();
+}
+document.getElementById("recOk").addEventListener("click",function(){recDlg.close()});
+recDlg.addEventListener("cancel",function(e){e.preventDefault()});
+document.getElementById("recCopy").addEventListener("click",function(){
+  var t=document.getElementById("recCode").textContent;
+  try{navigator.clipboard.writeText(t);document.getElementById("recCopy").textContent="تم النسخ"}catch(_){}
+});
 async function doAuth(signup){
   if(authBusy)return;
   var n=nameIn.value.trim().replace(/\s+/g," ").toLowerCase(), p=passIn.value;
   if(!n||!p){loginErr.textContent="اكتب اسم المستخدم وكلمة السر.";return}
+  if(resetMode&&!codeIn.value.trim()){loginErr.textContent="اكتب رمز الاسترجاع.";return}
   authBusy=true; loginErr.textContent="جارٍ الاتصال…";
   try{
-    var r=await sbRpc(signup?"wk_signup":"wk_login",{p_user:n,p_pass:p});
+    var r=resetMode?await sbRpc("wk_reset",{p_user:n,p_code:codeIn.value,p_pass:p}):await sbRpc(signup?"wk_signup":"wk_login",{p_user:n,p_pass:p});
     if(r&&r.error)throw Object.assign(new Error(C_ERR[r.error]||"تعذّر الدخول."),{code:r.error});
     user=r.username; cSetTok(r.token);
     try{localStorage.setItem("wk:last",user)}catch(_){}
@@ -806,6 +844,7 @@ async function doAuth(signup){
     else cSchedule();
     cMode=1; passIn.value=""; loginErr.textContent=""; loginEl.hidden=true;
     await load(); sync();
+    if(r.recovery){var wasReset=resetMode;setResetMode(false);showRecovery(r.recovery,wasReset?"تم تغيير كلمة السر. رمزك الجديد":"رمز الاسترجاع")}
   }catch(e){loginErr.textContent=explain(e)}
   authBusy=false;
 }
@@ -813,6 +852,11 @@ function saveLocalOnly(d){try{localStorage.setItem(dkey(),JSON.stringify(d))}cat
 document.getElementById("loginBtn").addEventListener("click",function(){doAuth(false)});
 document.getElementById("signupBtn").addEventListener("click",function(){doAuth(true)});
 [nameIn,passIn].forEach(function(el){el.addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();doAuth(false)}})});
+document.getElementById("keyBtn").addEventListener("click",async function(){
+  setDrawer(false);
+  try{var r=await sbRpc("wk_new_recovery",{p_token:cTok()});showRecovery(r.recovery,"رمز استرجاع جديد (السابق لم يعد صالحًا)")}
+  catch(e){banner(explain(e))}
+});
 document.getElementById("gBtn").addEventListener("click",async function(){
   setDrawer(false); setStatus("busy","جارٍ المزامنة…"); banner("");
   if(cDirty)await cRun(); else await cPull(true);
