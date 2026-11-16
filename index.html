@@ -212,14 +212,14 @@ a.mbtn[hidden]{display:none}
 <body>
 <div id="splash"><div><div class="sp"></div>جارٍ التحميل…</div></div>
 <div id="login" hidden>
-  <form class="lcard" onsubmit="return false">
+  <form class="lcard" id="loginForm" method="post" action="#">
     <h2>الجدول الأسبوعي</h2>
     <p>سجّل الدخول لتظهر أهدافك على كل أجهزتك.</p>
-    <input id="uName" autocomplete="username" placeholder="اسم المستخدم" maxlength="40" aria-label="اسم المستخدم" autocapitalize="none">
+    <input id="uName" name="username" autocomplete="username" placeholder="اسم المستخدم" maxlength="40" aria-label="اسم المستخدم" autocapitalize="none">
     <input id="uCode" placeholder="رمز الاسترجاع (XXXX-XXXX-XXXX)" maxlength="20" dir="ltr" autocapitalize="characters" aria-label="رمز الاسترجاع" hidden>
-    <input id="uPass" type="password" autocomplete="current-password" placeholder="كلمة السر" maxlength="100" aria-label="كلمة السر">
+    <input id="uPass" name="password" type="password" autocomplete="current-password" placeholder="كلمة السر" maxlength="100" aria-label="كلمة السر">
     <div class="err2" id="loginErr" role="alert"></div>
-    <button type="button" class="btn primary" id="loginBtn" style="width:100%;min-height:46px">دخول</button>
+    <button type="submit" class="btn primary" id="loginBtn" style="width:100%;min-height:46px">دخول</button>
     <button type="button" class="btn" id="signupBtn" style="width:100%;min-height:46px;margin-top:8px">حساب جديد</button>
     <button type="button" class="linkbtn" id="forgotBtn">نسيت كلمة السر؟</button>
   </form>
@@ -801,7 +801,9 @@ var loginEl=document.getElementById("login"), nameIn=document.getElementById("uN
 function showLogin(){
   user=null; items=[]; render(); banner(""); cMode=0;
   try{localStorage.removeItem("wk:last")}catch(_){}
-  loginEl.hidden=false; passIn.value=""; setTimeout(function(){nameIn.focus()},50);
+  loginEl.hidden=false; passIn.value="";
+  try{nameIn.value=localStorage.getItem("wk:uname")||""}catch(_){}
+  setTimeout(function(){(nameIn.value?passIn:nameIn).focus()},50);
 }
 var authBusy=false, resetMode=false, codeIn=document.getElementById("uCode");
 function setResetMode(on){
@@ -835,6 +837,8 @@ async function doAuth(signup){
     var r=resetMode?await sbRpc("wk_reset",{p_user:n,p_code:codeIn.value,p_pass:p}):await sbRpc(signup?"wk_signup":"wk_login",{p_user:n,p_pass:p});
     if(r&&r.error)throw Object.assign(new Error(C_ERR[r.error]||"تعذّر الدخول."),{code:r.error});
     user=r.username; cSetTok(r.token);
+    try{localStorage.setItem("wk:uname",user)}catch(_){}
+    try{if(window.PasswordCredential&&navigator.credentials&&navigator.credentials.store)navigator.credentials.store(new PasswordCredential({id:user,password:p,name:user}))}catch(_){}
     try{localStorage.setItem("wk:last",user)}catch(_){}
     var rem=cNorm(r.data), loc=readData();
     cDirty=false; try{cDirty=localStorage.getItem(cDirtyKey())==="1"}catch(_){}
@@ -848,9 +852,8 @@ async function doAuth(signup){
   authBusy=false;
 }
 function saveLocalOnly(d){try{localStorage.setItem(dkey(),JSON.stringify(d))}catch(_){}}
-document.getElementById("loginBtn").addEventListener("click",function(){doAuth(false)});
+document.getElementById("loginForm").addEventListener("submit",function(e){e.preventDefault();doAuth(false)});
 document.getElementById("signupBtn").addEventListener("click",function(){doAuth(true)});
-[nameIn,passIn].forEach(function(el){el.addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();doAuth(false)}})});
 document.getElementById("keyBtn").addEventListener("click",async function(){
   setDrawer(false);
   try{var r=await sbRpc("wk_new_recovery",{p_token:cTok()});showRecovery(r.recovery,"رمز استرجاع جديد (السابق لم يعد صالحًا)")}
