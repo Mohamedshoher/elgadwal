@@ -80,6 +80,14 @@ svg{display:block;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:ro
 #alertDlg .arow:last-child{border-bottom:0}
 #alertDlg .aname{font-weight:600}
 #alertDlg .atype{color:var(--muted);font-size:13px}
+form.add .sched{grid-column:1/-1;display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--muted)}
+.sched .modes{display:flex;gap:14px;color:var(--ink)}
+.sched .modes label{flex-direction:row;align-items:center;gap:6px;font-size:14px;color:var(--ink)}
+.sched .modes input{width:auto}
+.sched .dchips{display:flex;flex-wrap:wrap;gap:6px}
+.sched .dchips button{border:1px solid var(--line);background:var(--bg);border-radius:999px;padding:5px 12px;font-size:14px;color:var(--ink)}
+.sched .dchips button[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:#fff}
+.sched .dchips[hidden]{display:none}
 #alertDlg .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
 #alertDlg .chip{border:1px solid var(--line);background:var(--bg);border-radius:999px;padding:4px 10px;font-size:13px}
 #alertDlg .chip:hover{border-color:var(--accent);color:var(--accent)}
@@ -122,6 +130,7 @@ h1{font-family:var(--font-display);font-size:26px;line-height:1.2;margin:0}
 .l1{display:flex;align-items:center;gap:4px}
 .name{font-weight:600;flex:1;min-width:0;overflow-wrap:anywhere}
 .item.done .name{color:var(--muted);text-decoration:line-through;text-decoration-color:var(--line)}
+.sdays{color:var(--accent);font-size:12px}
 .l2{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:1px;font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
 .qty{background:none;border:1px dashed var(--line);border-radius:7px;padding:0 8px;min-height:26px;color:var(--ink);font-size:13px}
 .qty.empty{color:var(--muted)}
@@ -302,6 +311,14 @@ a.mbtn[hidden]{display:none}
     <label>الهدف الأسبوعي<input id="fWeekly" type="number" min="0.1" step="any" required inputmode="decimal"></label>
     <label>الهدف اليومي<input id="fDaily" type="number" min="0.1" step="any" required inputmode="decimal"></label>
     <label>الكم (اختياري)<input id="fQty" placeholder="مثل: 1-40"></label>
+    <div class="sched">
+      <span>أيام الهدف</span>
+      <div class="modes">
+        <label><input type="radio" name="fMode" value="all" checked> تلقائي: السبت إلى الخميس</label>
+        <label><input type="radio" name="fMode" value="custom"> مخصص</label>
+      </div>
+      <div class="dchips" id="fDays" hidden></div>
+    </div>
     <datalist id="typeList"></datalist>
   </form>
   <div class="err2" id="addErr" role="alert"></div>
@@ -345,7 +362,7 @@ a.mbtn[hidden]{display:none}
 <script>
 (function(){
 "use strict";
-var DAYS=["السبت","الأحد","الاثنين","الثلاثاء","الأربعاء","الخميس"];
+var DAYS=["السبت","الأحد","الاثنين","الثلاثاء","الأربعاء","الخميس","الجمعة"];
 var mcp=false, pending=0, editing=null, editRow=null, delRow=null, sel=0, drawerOpen=false;
 
 var SEED=[
@@ -364,26 +381,41 @@ var items=[];
 
 function mk(r,row){
   return {row:row,type:String(r[0]||"").trim(),cls:String(r[1]||"").trim(),time:num(r[2]),weekly:num(r[3]),
-    qty:String(r[4]==null?"":r[4]),daily:num(r[5]),days:[0,1,2,3,4,5].map(function(k){var v=r[6+k];return v===true||v===1||String(v).toUpperCase()==="TRUE"})};
+    qty:String(r[4]==null?"":r[4]),daily:num(r[5]),days:[0,1,2,3,4,5,6].map(function(k){var v=r[6+k];return v===true||v===1||String(v).toUpperCase()==="TRUE"}),
+    sched:normSched(r[13])};
+}
+/* sched: null = تلقائي (السبت إلى الخميس)، أو مصفوفة من 7 قيم صح/خطأ */
+function normSched(v){
+  if(!Array.isArray(v))return null;
+  var a=[0,1,2,3,4,5,6].map(function(k){return v[k]===true});
+  return a.some(Boolean)?a:null;
+}
+function active(it,d){return it.sched?!!it.sched[d]:d<6}
+function hasFri(){return items.some(function(i){return active(i,6)})}
+function visDays(){return hasFri()?[0,1,2,3,4,5,6]:[0,1,2,3,4,5]}
+function schedText(it){
+  if(!it.sched)return "";
+  var n=it.sched.filter(Boolean).length;
+  return n===7?"كل الأيام":it.sched.map(function(x,d){return x?DAYS[d]:null}).filter(Boolean).join(" · ");
 }
 function num(v){var n=parseFloat(String(v).replace("٫",".").replace(",","."));return isNaN(n)?0:n}
 function esc(s){return String(s).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})}
 function pct(it){if(!it.weekly)return 0;var c=it.days.filter(Boolean).length;return Math.min(999,it.daily*c/it.weekly*100)}
 function f1(x){return (Math.round(x*10)/10).toString().replace(".","٫")}
-function todayIdx(){var d=new Date().getDay();return d===6?0:(d>=0&&d<=4?d+1:-1)}
+function todayIdx(){var d=new Date().getDay();return d===6?0:(d===5?6:d+1)}
 function colorFor(p){return p>=100?"var(--good)":p>=50?"var(--accent)":p>0?"var(--warn)":"var(--line)"}
 function find(row){return items.filter(function(i){return i.row===row})[0]}
-sel=todayIdx(); if(sel<0)sel=0;
+sel=todayIdx(); if(sel>5)sel=0;
 
 var ICON_CHECK='<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
 var ICON_EDIT='<svg viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4"/></svg>';
 var ICON_DEL='<svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12h10l1-12M9 7V4h6v3"/></svg>';
 
 function missedInfo(){
-  var t=todayIdx(), pos=t<0?6:t, y=pos-1, yest=[], older=[], seen={};
+  var pos=todayIdx(), y=pos-1, yest=[], older=[], seen={};
   items.forEach(function(i){
-    var ym=(y>=0&&!i.days[y]), om=[];
-    for(var d=0;d<y;d++)if(!i.days[d])om.push(d);
+    var ym=(y>=0&&active(i,y)&&!i.days[y]), om=[];
+    for(var d=0;d<y;d++)if(active(i,d)&&!i.days[d])om.push(d);
     if(ym){yest.push(i);seen[i.row]=1}
     if(om.length){older.push({it:i,days:om});seen[i.row]=1}
   });
@@ -418,28 +450,30 @@ function renderAlert(){
 }
 function render(){
   updateBell();
-  var total=items.reduce(function(a,i){return a+i.time},0), t=todayIdx();
-  var dp=DAYS.map(function(_,d){var done=items.reduce(function(a,i){return a+(i.days[d]?i.time:0)},0);return total?done/total*100:0});
-  var overall=dp.reduce(function(a,b){return a+b},0)/6;
+  var t=todayIdx(), vd=visDays();
+  if(vd.indexOf(sel)<0)sel=0;
+  var dp=DAYS.map(function(_,d){var tot=0,done=0;items.forEach(function(i){if(active(i,d)){tot+=i.time;if(i.days[d])done+=i.time}});return tot?done/tot*100:0});
+  var overall=vd.reduce(function(a,d){return a+dp[d]},0)/vd.length;
 
   document.getElementById("wTotal").textContent=f1(overall)+"%";
-  document.getElementById("wDays").innerHTML=DAYS.map(function(n,d){
+  document.getElementById("wDays").innerHTML=vd.map(function(d){var n=DAYS[d];
     return '<div class="wrow"><span>'+n+'</span><div class="track"><i style="width:'+Math.min(100,dp[d])+'%;background:var(--accent)"></i></div><b>'+f1(dp[d])+'%</b></div>';
   }).join("");
 
-  document.getElementById("tabs").innerHTML=DAYS.map(function(n,d){
+  document.getElementById("tabs").innerHTML=vd.map(function(d){var n=DAYS[d];
     return '<button type="button" role="tab" class="tab'+(d===t?' today':'')+'" data-tab="'+d+'" aria-selected="'+(d===sel)+'"><span class="n">'+n+'</span><span class="p">'+f1(dp[d])+'%</span></button>';
   }).join("");
 
-  var doneN=items.filter(function(i){return i.days[sel]}).length;
-  document.getElementById("sub").textContent=(sel===t?"اليوم · ":"")+DAYS[sel]+" · أنجزت "+doneN+" من "+items.length;
+  var dayItems=items.filter(function(i){return active(i,sel)});
+  var doneN=dayItems.filter(function(i){return i.days[sel]}).length;
+  document.getElementById("sub").textContent=(sel===t?"اليوم · ":"")+DAYS[sel]+" · أنجزت "+doneN+" من "+dayItems.length;
 
   var order=[], by={};
-  items.forEach(function(i){if(!by[i.type]){by[i.type]=[];order.push(i.type)}by[i.type].push(i)});
-  document.getElementById("groups").innerHTML=items.length?order.map(function(g){
+  dayItems.forEach(function(i){if(!by[i.type]){by[i.type]=[];order.push(i.type)}by[i.type].push(i)});
+  document.getElementById("groups").innerHTML=dayItems.length?order.map(function(g){
     var list=by[g], mins=list.reduce(function(a,i){return a+i.time},0);
     return '<div class="gh"><strong>'+esc(g)+'</strong><span>'+mins+' دقيقة</span></div><div class="card">'+list.map(rowHtml).join("")+'</div>';
-  }).join(""):'<div class="empty-note">لا توجد أهداف بعد. افتح القائمة وأضف هدفًا.</div>';
+  }).join(""):'<div class="empty-note">'+(items.length?'لا توجد أهداف في هذا اليوم.':'لا توجد أهداف بعد. افتح القائمة وأضف هدفًا.')+'</div>';
   var q=document.querySelector(".qin"); if(q){q.focus();q.select()}
 }
 function rowHtml(i){
@@ -453,7 +487,7 @@ function rowHtml(i){
       '<div class="l1"><span class="name">'+esc(i.cls)+'</span>'+
         '<button type="button" class="icon sm" data-act="edit" data-row="'+i.row+'" aria-label="تعديل الهدف">'+ICON_EDIT+'</button>'+
         '<button type="button" class="icon sm del" data-act="del" data-row="'+i.row+'" aria-label="حذف الهدف">'+ICON_DEL+'</button></div>'+
-      '<div class="l2">'+qty+'<span>'+i.time+' د</span><span class="pct">'+f1(p)+'%</span></div>'+
+      '<div class="l2">'+qty+'<span>'+i.time+' د</span>'+(i.sched?'<span class="sdays" title="أيام الهدف">'+esc(schedText(i))+'</span>':'')+'<span class="pct">'+f1(p)+'%</span></div>'+
       '<div class="track"><i style="width:'+Math.min(100,p)+'%;background:'+colorFor(p)+'"></i></div>'+
     '</div></div>';
 }
@@ -497,6 +531,7 @@ async function call(name){
     var type=String(g.type||"").trim(), cls=String(g.cls||"").trim(), time=Number(g.time), weekly=Number(g.weekly), daily=Number(g.daily);
     if(!type||!cls||!(time>0)||!(weekly>0)||!(daily>0))throw new Error("بيانات الهدف غير مكتملة.");
     x[0]=type;x[1]=cls;x[2]=time;x[3]=weekly;x[4]=String(g.qty||"");x[5]=daily;
+    var sc=normSched(g.sched); x[13]=sc; if(x[12]===undefined)x[12]=false;
   }
   switch(name){
     case "api_init":
@@ -505,21 +540,21 @@ async function call(name){
     case "api_setQty": at(a[0])[4]=String(a[1]||""); break;
     case "api_addGoal":
       if(it.length>=40)throw new Error("وصلت للحد الأقصى: 40 هدفًا.");
-      r=["","",0,0,"",0,false,false,false,false,false,false]; fill(r,a[0]); it.push(r); break;
+      r=["","",0,0,"",0,false,false,false,false,false,false,false,null]; fill(r,a[0]); it.push(r); break;
     case "api_editGoal": fill(at(a[0]),a[1]); break;
     case "api_deleteGoal": at(a[0]); it.splice(Number(a[0])-2,1); break;
     case "api_newWeek":
       var date=String(a[0]||"");
       if(!/^\d{4}-\d{2}-\d{2}$/.test(date))throw new Error("تاريخ غير صحيح.");
-      if(it.some(function(v){return v.slice(6,12).some(Boolean)})){
+      if(it.some(function(v){return v.slice(6,13).some(Boolean)})){
         if(d.hist.some(function(h){return h.date===date}))return {dup:true};
-        it.forEach(function(v){d.hist.push({date:date,type:v[0],cls:v[1],time:v[2],weekly:v[3],daily:v[5],qty:v[4],days:v.slice(6,12)})});
+        it.forEach(function(v){d.hist.push({date:date,type:v[0],cls:v[1],time:v[2],weekly:v[3],daily:v[5],qty:v[4],days:v.slice(6,13),sched:v[13]||null})});
       }
-      it.forEach(function(v){for(var k=6;k<12;k++)v[k]=false});
+      it.forEach(function(v){for(var k=6;k<13;k++)v[k]=false});
       break;
     case "api_history":
       var w={};
-      d.hist.forEach(function(h){(w[h.date]=w[h.date]||[]).push({type:h.type,cls:h.cls,time:Number(h.time)||0,weekly:Number(h.weekly)||0,daily:Number(h.daily)||0,days:(h.days||[]).map(function(x){return x===true})})});
+      d.hist.forEach(function(h){(w[h.date]=w[h.date]||[]).push({type:h.type,cls:h.cls,time:Number(h.time)||0,weekly:Number(h.weekly)||0,daily:Number(h.daily)||0,days:(h.days||[]).map(function(x){return x===true}),sched:normSched(h.sched)})});
       return w;
     default: throw new Error("طلب غير معروف.");
   }
@@ -637,7 +672,7 @@ async function saveQty(row,val){
 /* إضافة وتعديل وحذف */
 async function addGoal(g){
   if(items.length>=40){banner("وصلت للحد الأقصى: 40 هدفًا.");return false}
-  var it=mk([g.type,g.cls,g.time,g.weekly,g.qty,g.daily,0,0,0,0,0,0],items.length+2);
+  var it=mk([g.type,g.cls,g.time,g.weekly,g.qty,g.daily,0,0,0,0,0,0,0,g.sched],items.length+2);
   items.push(it); render();
   if(!need())return true;
   var ok=await write("api_addGoal",[g]);
@@ -646,15 +681,15 @@ async function addGoal(g){
 }
 async function editGoal(row,g){
   var it=find(row); if(!it)return;
-  var old={type:it.type,cls:it.cls,time:it.time,weekly:it.weekly,qty:it.qty,daily:it.daily};
-  it.type=g.type;it.cls=g.cls;it.time=g.time;it.weekly=g.weekly;it.qty=g.qty;it.daily=g.daily; render();
+  var old={type:it.type,cls:it.cls,time:it.time,weekly:it.weekly,qty:it.qty,daily:it.daily,sched:it.sched};
+  it.type=g.type;it.cls=g.cls;it.time=g.time;it.weekly=g.weekly;it.qty=g.qty;it.daily=g.daily;it.sched=normSched(g.sched); render();
   if(!need())return;
   var ok=await write("api_editGoal",[row,g]);
   if(!ok){for(var k in old)it[k]=old[k];render()}
 }
 async function deleteGoal(row){
   var idx=items.map(function(i){return i.row}).indexOf(row); if(idx<0)return;
-  var snap=items.map(function(i){return Object.assign({},i,{days:i.days.slice()})});
+  var snap=items.map(function(i){return Object.assign({},i,{days:i.days.slice(),sched:i.sched?i.sched.slice():null})});
   items.splice(idx,1);
   items.forEach(function(i,k){i.row=k+2}); render();
   if(!need())return;
@@ -663,6 +698,17 @@ async function deleteGoal(row){
 }
 
 var addDlg=document.getElementById("addDlg"), delDlg=document.getElementById("delDlg"), dlg=document.getElementById("dlg");
+var fSched=[false,false,false,false,false,false,false];
+function paintDays(){
+  var custom=document.querySelector('input[name=fMode]:checked').value==="custom", box=document.getElementById("fDays");
+  box.hidden=!custom;
+  box.innerHTML=DAYS.map(function(n,d){return '<button type="button" data-d="'+d+'" aria-pressed="'+fSched[d]+'">'+n+'</button>'}).join("");
+}
+document.getElementById("fDays").addEventListener("click",function(e){
+  var b=e.target.closest("[data-d]"); if(!b)return;
+  var d=+b.dataset.d; fSched[d]=!fSched[d]; paintDays();
+});
+Array.prototype.forEach.call(document.querySelectorAll('input[name=fMode]'),function(r){r.addEventListener("change",paintDays)});
 function openForm(it){
   editRow=it?it.row:null;
   document.getElementById("addForm").reset();
@@ -674,6 +720,8 @@ function openForm(it){
     document.getElementById("fWeekly").value=it.weekly; document.getElementById("fDaily").value=it.daily;
     document.getElementById("fQty").value=it.qty;
   }
+  fSched=it&&it.sched?it.sched.slice():[true,true,true,true,true,true,false];
+  document.querySelector('input[name=fMode][value='+(it&&it.sched?'custom':'all')+']').checked=true; paintDays();
   document.getElementById("addErr").textContent="";
   var seen={},opts="";items.forEach(function(i){if(!seen[i.type]){seen[i.type]=1;opts+='<option value="'+esc(i.type)+'">'}});
   document.getElementById("typeList").innerHTML=opts;
@@ -682,7 +730,11 @@ function openForm(it){
 document.getElementById("addNo").addEventListener("click",function(){addDlg.close()});
 document.getElementById("addYes").addEventListener("click",async function(){
   var v=function(id){return document.getElementById(id).value.trim()}, err=document.getElementById("addErr");
-  var g={type:v("fType"),cls:v("fCls"),time:num(v("fTime")),weekly:num(v("fWeekly")),daily:num(v("fDaily")),qty:v("fQty")};
+  var g={type:v("fType"),cls:v("fCls"),time:num(v("fTime")),weekly:num(v("fWeekly")),daily:num(v("fDaily")),qty:v("fQty"),sched:null};
+  if(document.querySelector('input[name=fMode]:checked').value==="custom"){
+    if(!fSched.some(Boolean)){err.textContent="اختر يومًا واحدًا على الأقل.";return}
+    g.sched=fSched.slice();
+  }
   if(!g.type||!g.cls){err.textContent="اكتب النوع والبند.";return}
   if(!(g.time>0)||!(g.weekly>0)||!(g.daily>0)){err.textContent="الوقت والهدفان لازم يكونوا أكبر من صفر.";return}
   if(items.some(function(i){return i.row!==editRow&&i.type===g.type&&i.cls===g.cls})){err.textContent="هذا البند موجود في الجدول.";return}
@@ -703,9 +755,9 @@ async function readHistory(){
   return {weeks:w||{}};
 }
 function weekStats(rows){
-  var total=rows.reduce(function(a,i){return a+i.time},0);
-  var dp=[0,1,2,3,4,5].map(function(d){var done=rows.reduce(function(a,i){return a+(i.days[d]?i.time:0)},0);return total?done/total*100:0});
-  return {dp:dp,overall:dp.reduce(function(a,b){return a+b},0)/6};
+  var dp=[0,1,2,3,4,5,6].map(function(d){var tot=0,done=0;rows.forEach(function(i){var on=i.sched?!!i.sched[d]:d<6;if(on||i.days[d]){tot+=i.time;if(i.days[d])done+=i.time}});return tot?done/tot*100:0});
+  var vd=[0,1,2,3,4,5].concat(dp[6]>0||rows.some(function(i){return i.sched&&i.sched[6]})?[6]:[]);
+  return {dp:dp,overall:vd.reduce(function(a,d){return a+dp[d]},0)/vd.length};
 }
 async function newWeek(date){
   if(!need())return;
@@ -713,7 +765,7 @@ async function newWeek(date){
   try{
     var r=await call("api_newWeek",date);
     if(r&&r.dup){setStatus("err","لم يُحفظ");banner("أسبوع "+fmtDate(date)+" محفوظ في السجل من قبل. اختر تاريخًا آخر ثم أعد المحاولة.");return}
-    items.forEach(function(i){i.days=[false,false,false,false,false,false]});
+    items.forEach(function(i){i.days=[false,false,false,false,false,false,false]});
     hist=null; banner(""); render(); sync();
   }catch(e){setStatus("err","تعذّر الحفظ");banner(explain(e)+" لم يُمسح شيء.")}
 }
@@ -731,10 +783,10 @@ function buildDayMap(){
   var weeks={}, map={};
   if(hist){Object.keys(hist.weeks).forEach(function(k){weeks[k]=hist.weeks[k]})}
   var cw=currentWeekStart();
-  if(!weeks[cw]){weeks[cw]=items.map(function(i){return {type:i.type,cls:i.cls,time:i.time,days:i.days}})}
+  if(!weeks[cw]){weeks[cw]=items.map(function(i){return {type:i.type,cls:i.cls,time:i.time,days:i.days,sched:i.sched}})}
   Object.keys(weeks).forEach(function(ws){
     var rows=weeks[ws], m=ws.split("-"), st=weekStats(rows);
-    for(var d=0;d<6;d++){
+    for(var d=0;d<7;d++){
       if(!rows.some(function(r){return r.days[d]}))continue;
       map[iso(new Date(+m[0],+m[1]-1,+m[2]+d))]={d:d,rows:rows,pct:st.dp[d]};
     }
@@ -761,10 +813,11 @@ function renderCal(){
   if(calSel){
     var m=calSel.split("-"), full=new Date(+m[0],+m[1]-1,+m[2]).toLocaleDateString("ar-EG",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
     if(r){
-      var done=r.rows.filter(function(x){return x.days[r.d]}).length;
-      html+='<div class="dh"><strong>'+full+'</strong><span class="pp">'+f1(r.pct)+'%</span></div><div class="s">أنجزت '+done+' من '+r.rows.length+' بالوقت</div><table class="htab"><tbody>';
+      var drows=r.rows.filter(function(x){return (x.sched?!!x.sched[r.d]:r.d<6)||x.days[r.d]});
+      var done=drows.filter(function(x){return x.days[r.d]}).length;
+      html+='<div class="dh"><strong>'+full+'</strong><span class="pp">'+f1(r.pct)+'%</span></div><div class="s">أنجزت '+done+' من '+drows.length+' بالوقت</div><table class="htab"><tbody>';
       var last=null;
-      r.rows.forEach(function(x){
+      drows.forEach(function(x){
         if(x.type!==last){last=x.type;html+='<tr class="tg"><td colspan="3">'+esc(x.type)+'</td></tr>'}
         var on=x.days[r.d];
         html+='<tr><td style="width:28px"><span class="mk'+(on?' on':'')+'"></span></td><td'+(on?'':' style="color:var(--muted)"')+'>'+esc(x.cls)+'</td><td style="width:56px;color:var(--muted)">'+x.time+' د</td></tr>';
