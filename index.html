@@ -108,10 +108,10 @@ h1{font-family:var(--font-display);font-size:26px;line-height:1.2;margin:0}
 .banner[hidden]{display:none}
 
 /* شريط الأيام */
-.tabs{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-bottom:14px}
-.tab{position:relative;padding:7px 2px 6px;border-radius:11px;border:1px solid var(--line);background:var(--surface);text-align:center;line-height:1.25}
-.tab .n{display:block;font-size:13px;font-weight:600}
-.tab .p{display:block;font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+.tabs{display:grid;grid-template-columns:1fr;gap:6px;margin-bottom:14px}
+.tab{position:relative;padding:9px 8px 8px;border-radius:11px;border:1px solid var(--line);background:var(--surface);text-align:center;line-height:1.25}
+.tab .n{display:block;font-size:15px;font-weight:600}
+.tab .p{display:block;font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
 .tab[aria-selected="true"]{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
 .tab[aria-selected="true"] .p{color:inherit;opacity:.85}
 .tab.today::after{content:"";position:absolute;bottom:-4px;left:50%;width:14px;height:3px;margin-left:-7px;border-radius:2px;background:var(--gold)}
@@ -498,7 +498,7 @@ function renderAlert(){
 function render(){
   updateBell();
   var t=todayIdx(), vd=visDays();
-  if(vd.indexOf(sel)<0)sel=0;
+  sel=vd.indexOf(t)>=0?t:0;
   var dp=DAYS.map(function(_,d){var tot=0,done=0;items.forEach(function(i){if(active(i,d)){tot+=i.time;done+=i.time*dv(i.days[d])}});return tot?done/tot*100:0});
   var overall=vd.reduce(function(a,d){return a+dp[d]},0)/vd.length;
 
@@ -507,10 +507,7 @@ function render(){
     return '<div class="wrow"><span>'+n+'</span><div class="track"><i style="width:'+Math.min(100,dp[d])+'%;background:var(--accent)"></i></div><b>'+f1(dp[d])+'%</b></div>';
   }).join("");
 
-  document.getElementById("tabs").innerHTML=vd.map(function(d){var n=DAYS[d];
-    return '<button type="button" role="tab" class="tab'+(d===t?' today':'')+'" data-tab="'+d+'" aria-selected="'+(d===sel)+'"><span class="n">'+n+'</span><span class="p">'+f1(dp[d])+'%</span></button>';
-  }).join("");
-
+  document.getElementById("tabs").innerHTML='<div class="tab today" role="tab" aria-selected="true" style="flex:1;cursor:default"><span class="n">'+(sel===t?"اليوم · ":"")+DAYS[sel]+'</span><span class="p">'+f1(dp[sel])+'%</span></div>';
   var live=items.filter(function(i){return !i.st}), isDone=function(i){return pct(i)>=100-1e-9};
   var cDone=live.filter(isDone).length, cLater=items.filter(function(i){return i.st==='p'}).length, cCancel=items.filter(function(i){return i.st==='c'}).length;
   [["nDone",cDone],["nLater",cLater],["nCancel",cCancel]].forEach(function(x){var e=document.getElementById(x[0]);e.textContent=x[1];e.hidden=!x[1]});
