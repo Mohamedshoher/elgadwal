@@ -43,7 +43,7 @@ button{font:inherit;color:inherit;cursor:pointer}
 svg{display:block;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 
 .app{display:grid;grid-template-columns:272px minmax(0,1fr);min-height:100%}
-.main{padding:16px 16px 56px;max-width:720px;width:100%;margin:0 auto}
+.main{padding:16px 16px 0;max-width:720px;width:100%;margin:0 auto}
 
 /* القائمة الجانبية */
 .drawer{background:var(--surface);border-inline-end:1px solid var(--line);padding:16px;display:flex;flex-direction:column;gap:14px;position:sticky;top:0;align-self:start;height:100vh;overflow:auto}
@@ -132,6 +132,18 @@ h1{font-family:var(--font-display);font-size:26px;line-height:1.2;margin:0}
 .fr .chip:hover,.fr .chip.on{border-color:var(--accent);color:var(--accent)}
 .fr .chip.on{font-weight:600}
 .fpart{color:var(--accent);font-weight:600}
+.fr.sec{margin-top:4px}
+.fr .chip.warn:hover{border-color:var(--warn);color:var(--warn)}
+.fr .chip.bad:hover{border-color:var(--bad);color:var(--bad)}
+.vnote{padding:8px 4px 0;font-size:13px;color:var(--muted)}
+.vrow .name{text-decoration:none}
+.foot{padding-bottom:6px}
+.fnav{position:sticky;bottom:0;display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-bottom:0;border-radius:16px 16px 0 0;padding:6px 6px calc(6px + env(safe-area-inset-bottom));margin-top:12px;box-shadow:0 -4px 14px rgba(0,0,0,.06);z-index:5}
+.fnav button{flex:1;display:flex;flex-direction:column;align-items:center;gap:1px;padding:5px 2px;border:0;border-radius:11px;background:none;color:var(--muted);font-size:12px;position:relative;min-height:48px}
+.fnav button svg{width:22px;height:22px}
+.fnav button[aria-pressed="true"]{background:var(--accent-soft);color:var(--accent);font-weight:600}
+.fnav .n{position:absolute;top:1px;inset-inline-end:calc(50% - 22px);min-width:17px;height:17px;border-radius:9px;background:var(--muted);color:var(--bg);font-size:11px;line-height:17px;text-align:center;padding:0 4px;font-weight:600}
+.fnav button[aria-pressed="true"] .n{background:var(--accent);color:var(--on-accent)}
 .tick[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
 .body{flex:1;min-width:0}
 .l1{display:flex;align-items:center;gap:4px}
@@ -306,6 +318,12 @@ a.mbtn[hidden]{display:none}
     <nav class="tabs" id="tabs" role="tablist" aria-label="أيام الأسبوع"></nav>
     <main id="groups"></main>
     <p class="foot">اسحب من الحافة اليمنى لفتح القائمة. بياناتك محفوظة على هذا الجهاز تحت اسمك. صدّر نسخة احتياطية قبل تغيير الجهاز.</p>
+    <nav class="fnav" id="fnav" aria-label="تصنيف الأهداف">
+      <button type="button" data-view="main" aria-pressed="true"><svg viewBox="0 0 24 24"><path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/></svg><span>الأهداف</span></button>
+      <button type="button" data-view="done" aria-pressed="false"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l3 3 5-6"/></svg><span>المكتملة</span><i class="n" id="nDone" hidden></i></button>
+      <button type="button" data-view="later" aria-pressed="false"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span>المؤجلة</span><i class="n" id="nLater" hidden></i></button>
+      <button type="button" data-view="cancel" aria-pressed="false"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9 9l6 6M15 9l-6 6"/></svg><span>الملغية</span><i class="n" id="nCancel" hidden></i></button>
+    </nav>
   </div>
 </div>
 
@@ -393,11 +411,12 @@ function dv(v){
   return n>0?Math.min(1,Math.round(n*100)/100):0;
 }
 function fracName(v){return v>=1?"تم":v===0.25?"ربع":v===0.5?"نصف":v===0.75?"ثلاثة أرباع":Math.round(v*100)+"٪"}
-var partRow=null;
+var partRow=null, view="main";
+var VIEWS={done:"المكتملة",later:"المؤجلة للأسبوع القادم",cancel:"الملغية"};
 function mk(r,row){
   return {row:row,type:String(r[0]||"").trim(),cls:String(r[1]||"").trim(),time:num(r[2]),weekly:num(r[3]),
     qty:String(r[4]==null?"":r[4]),daily:num(r[5]),days:[0,1,2,3,4,5,6].map(function(k){return dv(r[6+k])}),
-    sched:normSched(r[13])};
+    sched:normSched(r[13]),st:r[14]==='c'||r[14]==='p'?r[14]:''};
 }
 /* sched: null = تلقائي (السبت إلى الخميس)، أو مصفوفة من 7 قيم صح/خطأ */
 function normSched(v){
@@ -405,7 +424,7 @@ function normSched(v){
   var a=[0,1,2,3,4,5,6].map(function(k){return v[k]===true});
   return a.some(Boolean)?a:null;
 }
-function active(it,d){return it.sched?!!it.sched[d]:d<6}
+function active(it,d){return !it.st&&(it.sched?!!it.sched[d]:d<6)}
 function hasFri(){return items.some(function(i){return active(i,6)})}
 function visDays(){return hasFri()?[0,1,2,3,4,5,6]:[0,1,2,3,4,5]}
 function schedText(it){
@@ -479,11 +498,22 @@ function render(){
     return '<button type="button" role="tab" class="tab'+(d===t?' today':'')+'" data-tab="'+d+'" aria-selected="'+(d===sel)+'"><span class="n">'+n+'</span><span class="p">'+f1(dp[d])+'%</span></button>';
   }).join("");
 
-  var dayItems=items.filter(function(i){return active(i,sel)});
+  var live=items.filter(function(i){return !i.st}), isDone=function(i){return pct(i)>=100-1e-9};
+  var cDone=live.filter(isDone).length, cLater=items.filter(function(i){return i.st==='p'}).length, cCancel=items.filter(function(i){return i.st==='c'}).length;
+  [["nDone",cDone],["nLater",cLater],["nCancel",cCancel]].forEach(function(x){var e=document.getElementById(x[0]);e.textContent=x[1];e.hidden=!x[1]});
+  document.querySelectorAll("#fnav [data-view]").forEach(function(b){b.setAttribute("aria-pressed",String(b.dataset.view===view))});
+  document.getElementById("tabs").hidden=view!=="main";
+  if(view!=="main"){
+    var vl=view==="done"?live.filter(isDone):items.filter(function(i){return i.st===(view==="later"?"p":"c")});
+    var note=view==="done"?"أهداف بلغت 100٪ من هدفها الأسبوعي.":view==="later"?"تعود هذه الأهداف إلى قائمتك تلقائيًا عند بدء الأسبوع الجديد، ولا تدخل في نسبة هذا الأسبوع.":"أهداف ملغاة: لا تدخل في النسب ولا تظهر في القائمة، ويمكنك استرجاعها.";
+    document.getElementById("sub").textContent=VIEWS[view]+" · "+vl.length;
+    document.getElementById("groups").innerHTML='<div class="vnote">'+note+'</div>'+(vl.length?'<div class="gh"><strong>'+VIEWS[view]+'</strong><span>'+vl.length+'</span></div><div class="card">'+vl.map(vrowHtml).join("")+'</div>':'<div class="empty-note">لا توجد أهداف هنا.</div>');
+    return;
+  }
+  var dayItems=live.filter(function(i){return active(i,sel)});
   var doneN=dayItems.filter(function(i){return dv(i.days[sel])>=1}).length;
   document.getElementById("sub").textContent=(sel===t?"اليوم · ":"")+DAYS[sel]+" · أنجزت "+doneN+" من "+dayItems.length;
-
-  var todo=dayItems.filter(function(i){return pct(i)<100-1e-9}), fin=dayItems.filter(function(i){return pct(i)>=100-1e-9});
+  var todo=dayItems.filter(function(i){return !isDone(i)});
   var order=[], by={};
   todo.forEach(function(i){if(!by[i.type]){by[i.type]=[];order.push(i.type)}by[i.type].push(i)});
   var html=order.map(function(g){
@@ -492,10 +522,6 @@ function render(){
   }).join("");
   if(!dayItems.length)html='<div class="empty-note">'+(items.length?'لا توجد أهداف في هذا اليوم.':'لا توجد أهداف بعد. افتح القائمة وأضف هدفًا.')+'</div>';
   else if(!todo.length)html='<div class="empty-note">أحسنت، أكملت 100٪ من كل أهداف هذا اليوم.</div>';
-  if(fin.length){
-    var fm=fin.reduce(function(a,i){return a+i.time},0);
-    html+='<div class="gh"><strong>المكتمل</strong><span>'+fin.length+' · '+fm+' دقيقة</span></div><div class="card">'+fin.map(rowHtml).join("")+'</div>';
-  }
   document.getElementById("groups").innerHTML=html;
   var q=document.querySelector(".qin"); if(q){q.focus();q.select()}
 }
@@ -505,17 +531,31 @@ function rowHtml(i){
     ? '<input class="qin" id="qin" data-row="'+i.row+'" value="'+esc(i.qty)+'" aria-label="الكم">'
     : '<button type="button" class="qty'+(i.qty?'':' empty')+'" data-edit="'+i.row+'" title="تعديل الكم">'+(i.qty?esc(i.qty):'الكم')+'</button>';
   var fr=partRow===i.row?'<div class="fr">'+[[0.25,"ربع"],[0.5,"نصف"],[0.75,"ثلاثة أرباع"],[1,"تم كاملًا"],[0,"مسح"]].map(function(o){
-      return '<button type="button" class="chip'+(fv===o[0]?' on':'')+'" data-frac="'+o[0]+'" data-row="'+i.row+'">'+o[1]+'</button>'}).join("")+'</div>':'';
+      return '<button type="button" class="chip'+(fv===o[0]?' on':'')+'" data-frac="'+o[0]+'" data-row="'+i.row+'">'+o[1]+'</button>'}).join("")+'</div>'+
+      '<div class="fr sec"><button type="button" class="chip warn" data-st="p" data-row="'+i.row+'">تأجيل للأسبوع القادم</button><button type="button" class="chip bad" data-st="c" data-row="'+i.row+'">إلغاء الهدف</button></div>':'';
   return '<div class="item'+(on?' done':'')+(part?' partial':'')+'">'+
     '<button type="button" class="tick'+(part?' part':'')+'"'+(part?' style="--f:'+fv+'"':'')+' data-row="'+i.row+'" aria-pressed="'+on+'" aria-label="تم في '+DAYS[sel]+'">'+ICON_CHECK+'</button>'+
     '<div class="body">'+
       '<div class="l1"><span class="name">'+esc(i.cls)+'</span>'+
-        '<button type="button" class="icon sm" data-act="part" data-row="'+i.row+'" aria-label="تعليم جزء من الهدف (ربع أو نصف)" title="تعليم ربع أو نصف" style="font-size:15px;font-weight:600">½</button>'+
+        '<button type="button" class="icon sm" data-act="part" data-row="'+i.row+'" aria-label="تعليم جزء أو تأجيل أو إلغاء" title="ربع/نصف، تأجيل، إلغاء" style="font-size:18px;font-weight:700;line-height:1">⋯</button>'+
         '<button type="button" class="icon sm" data-act="edit" data-row="'+i.row+'" aria-label="تعديل الهدف">'+ICON_EDIT+'</button>'+
         '<button type="button" class="icon sm del" data-act="del" data-row="'+i.row+'" aria-label="حذف الهدف">'+ICON_DEL+'</button></div>'+
       '<div class="l2">'+qty+'<span>'+i.time+' د</span>'+(part?'<span class="fpart">'+fracName(fv)+' ('+f1(i.time*fv)+' د)</span>':'')+(i.sched?'<span class="sdays" title="أيام الهدف">'+esc(schedText(i))+'</span>':'')+'<span class="pct">'+f1(p)+'%</span></div>'+
       '<div class="track"><i style="width:'+Math.min(100,p)+'%;background:'+colorFor(p)+'"></i></div>'+fr+
     '</div></div>';
+}
+
+function vrowHtml(i){
+  var p=pct(i), acts=i.st==='c'?'<button type="button" class="chip" data-st="" data-row="'+i.row+'">استرجاع</button>'
+    :i.st==='p'?'<button type="button" class="chip" data-st="" data-row="'+i.row+'">تفعيل الآن</button><button type="button" class="chip bad" data-st="c" data-row="'+i.row+'">إلغاء الهدف</button>'
+    :'<button type="button" class="chip warn" data-st="p" data-row="'+i.row+'">تأجيل</button><button type="button" class="chip bad" data-st="c" data-row="'+i.row+'">إلغاء الهدف</button>';
+  return '<div class="item vrow"><div class="body">'+
+    '<div class="l1"><span class="name">'+esc(i.cls)+'</span>'+
+      '<button type="button" class="icon sm" data-act="edit" data-row="'+i.row+'" aria-label="تعديل الهدف">'+ICON_EDIT+'</button>'+
+      '<button type="button" class="icon sm del" data-act="del" data-row="'+i.row+'" aria-label="حذف الهدف">'+ICON_DEL+'</button></div>'+
+    '<div class="l2"><span>'+esc(i.type)+'</span>'+(i.qty?'<span>'+esc(i.qty)+'</span>':'')+'<span>'+i.time+' د</span><span class="pct">'+f1(p)+'%</span></div>'+
+    '<div class="track"><i style="width:'+Math.min(100,p)+'%;background:'+colorFor(p)+'"></i></div>'+
+    '<div class="fr">'+acts+'</div></div></div>';
 }
 
 /* الحالة والأخطاء */
@@ -562,6 +602,7 @@ async function call(name){
   switch(name){
     case "api_init":
       return {email:user,url:null,rows:it.map(function(v,i){return {row:i+2,v:v}})};
+    case "api_setStatus": at(a[0])[14]=a[1]==="c"||a[1]==="p"?a[1]:0; break;
     case "api_setDay": at(a[0])[6+Number(a[1])]=dv(a[2]); break;
     case "api_setQty": at(a[0])[4]=String(a[1]||""); break;
     case "api_addGoal":
@@ -574,9 +615,9 @@ async function call(name){
       if(!/^\d{4}-\d{2}-\d{2}$/.test(date))throw new Error("تاريخ غير صحيح.");
       if(it.some(function(v){return v.slice(6,13).some(Boolean)})){
         if(d.hist.some(function(h){return h.date===date}))return {dup:true};
-        it.forEach(function(v){d.hist.push({date:date,type:v[0],cls:v[1],time:v[2],weekly:v[3],daily:v[5],qty:v[4],days:v.slice(6,13),sched:v[13]||null})});
+        it.forEach(function(v){if(v[14]&&!v.slice(6,13).some(Boolean))return;d.hist.push({date:date,type:v[0],cls:v[1],time:v[2],weekly:v[3],daily:v[5],qty:v[4],days:v.slice(6,13),sched:v[13]||null})});
       }
-      it.forEach(function(v){for(var k=6;k<13;k++)v[k]=false});
+      it.forEach(function(v){for(var k=6;k<13;k++)v[k]=false; if(v[14]==="p")v[14]=0});
       break;
     case "api_history":
       var w={};
@@ -690,6 +731,13 @@ function toggle(row,d){
   var it=find(row); if(!it)return;
   return setFrac(row,d,dv(it.days[d])>=1?0:1);
 }
+async function setSt(row,st){
+  var it=find(row); if(!it)return;
+  var old=it.st; it.st=st; partRow=null; render();
+  if(!need())return;
+  var ok=await write("api_setStatus",[row,st]);
+  if(!ok){it.st=old;render()}
+}
 async function saveQty(row,val){
   var it=find(row); editing=null; if(!it){render();return}
   if(val===it.qty){render();return}
@@ -795,7 +843,7 @@ async function newWeek(date){
   try{
     var r=await call("api_newWeek",date);
     if(r&&r.dup){setStatus("err","لم يُحفظ");banner("أسبوع "+fmtDate(date)+" محفوظ في السجل من قبل. اختر تاريخًا آخر ثم أعد المحاولة.");return}
-    items.forEach(function(i){i.days=[0,0,0,0,0,0,0]});
+    items.forEach(function(i){i.days=[0,0,0,0,0,0,0]; if(i.st==='p')i.st=''});
     hist=null; banner(""); render(); sync();
   }catch(e){setStatus("err","تعذّر الحفظ");banner(explain(e)+" لم يُمسح شيء.")}
 }
@@ -813,7 +861,7 @@ function buildDayMap(){
   var weeks={}, map={};
   if(hist){Object.keys(hist.weeks).forEach(function(k){weeks[k]=hist.weeks[k]})}
   var cw=currentWeekStart();
-  if(!weeks[cw]){weeks[cw]=items.map(function(i){return {type:i.type,cls:i.cls,time:i.time,days:i.days,sched:i.sched}})}
+  if(!weeks[cw]){weeks[cw]=items.filter(function(i){return !i.st||i.days.some(Boolean)}).map(function(i){return {type:i.type,cls:i.cls,time:i.time,days:i.days,sched:i.sched}})}
   Object.keys(weeks).forEach(function(ws){
     var rows=weeks[ws], m=ws.split("-"), st=weekStats(rows);
     for(var d=0;d<7;d++){
@@ -1014,6 +1062,8 @@ document.getElementById("outBtn").addEventListener("click",async function(){
 });
 /* أحداث القائمة الرئيسية */
 document.addEventListener("click",function(e){
+  var sb=e.target.closest&&e.target.closest("[data-st]"); if(sb){setSt(+sb.dataset.row,sb.dataset.st);return}
+  var vb=e.target.closest&&e.target.closest("[data-view]"); if(vb){view=vb.dataset.view;partRow=null;render();window.scrollTo(0,0);return}
   var fc=e.target.closest&&e.target.closest("[data-frac]"); if(fc){partRow=null;setFrac(+fc.dataset.row,sel,+fc.dataset.frac);return}
   var tk=e.target.closest&&e.target.closest(".tick"); if(tk){partRow=null;toggle(+tk.dataset.row,sel);return}
   var tab=e.target.closest&&e.target.closest("[data-tab]"); if(tab){sel=+tab.dataset.tab;partRow=null;render();return}
