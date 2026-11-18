@@ -108,7 +108,12 @@ h1{font-family:var(--font-display);font-size:26px;line-height:1.2;margin:0}
 .banner[hidden]{display:none}
 
 /* شريط الأيام */
-.tabs{display:grid;grid-template-columns:1fr;gap:6px;margin-bottom:14px}
+.tabs{display:flex;gap:8px;margin-bottom:14px}
+.tabs .tab{flex:1}
+.tarr{width:46px;flex:none;border-radius:11px;border:1px solid var(--line);background:var(--surface);display:flex;align-items:center;justify-content:center;padding:0}
+.tarr svg{width:22px;height:22px}
+.tarr:hover:not(:disabled){border-color:var(--accent);color:var(--accent)}
+.tarr:disabled{opacity:.35;cursor:default}
 .tab{position:relative;padding:9px 8px 8px;border-radius:11px;border:1px solid var(--line);background:var(--surface);text-align:center;line-height:1.25}
 .tab .n{display:block;font-size:15px;font-weight:600}
 .tab .p{display:block;font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
@@ -498,7 +503,7 @@ function renderAlert(){
 function render(){
   updateBell();
   var t=todayIdx(), vd=visDays();
-  sel=vd.indexOf(t)>=0?t:0;
+  if(vd.indexOf(sel)<0)sel=0;
   var dp=DAYS.map(function(_,d){var tot=0,done=0;items.forEach(function(i){if(active(i,d)){tot+=i.time;done+=i.time*dv(i.days[d])}});return tot?done/tot*100:0});
   var overall=vd.reduce(function(a,d){return a+dp[d]},0)/vd.length;
 
@@ -507,7 +512,11 @@ function render(){
     return '<div class="wrow"><span>'+n+'</span><div class="track"><i style="width:'+Math.min(100,dp[d])+'%;background:var(--accent)"></i></div><b>'+f1(dp[d])+'%</b></div>';
   }).join("");
 
-  document.getElementById("tabs").innerHTML='<div class="tab today" role="tab" aria-selected="true" style="flex:1;cursor:default"><span class="n">'+(sel===t?"اليوم · ":"")+DAYS[sel]+'</span><span class="p">'+f1(dp[sel])+'%</span></div>';
+  var vi=vd.indexOf(sel);
+  document.getElementById("tabs").innerHTML=
+    '<button type="button" class="tarr" data-dnav="-1" aria-label="اليوم السابق"'+(vi<=0?' disabled':'')+'><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>'+
+    '<button type="button" class="tab'+(sel===t?' today':'')+'" role="tab" aria-selected="true" data-dnav="today" title="العودة إلى اليوم"><span class="n">'+(sel===t?"اليوم · ":"")+DAYS[sel]+'</span><span class="p">'+f1(dp[sel])+'%</span></button>'+
+    '<button type="button" class="tarr" data-dnav="1" aria-label="اليوم التالي"'+(vi>=vd.length-1?' disabled':'')+'><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button>';
   var live=items.filter(function(i){return !i.st}), isDone=function(i){return pct(i)>=100-1e-9};
   var cDone=live.filter(isDone).length, cLater=items.filter(function(i){return i.st==='p'}).length, cCancel=items.filter(function(i){return i.st==='c'}).length;
   [["nDone",cDone],["nLater",cLater],["nCancel",cCancel]].forEach(function(x){var e=document.getElementById(x[0]);e.textContent=x[1];e.hidden=!x[1]});
@@ -1085,7 +1094,9 @@ document.addEventListener("click",function(e){
   var vb=e.target.closest&&e.target.closest("[data-view]"); if(vb){view=vb.dataset.view;partRow=null;render();window.scrollTo(0,0);return}
   var fc=e.target.closest&&e.target.closest("[data-frac]"); if(fc){partRow=null;setFrac(+fc.dataset.row,sel,+fc.dataset.frac);return}
   var tk=e.target.closest&&e.target.closest(".tick"); if(tk){partRow=null;toggle(+tk.dataset.row,sel);return}
-  var tab=e.target.closest&&e.target.closest("[data-tab]"); if(tab){sel=+tab.dataset.tab;partRow=null;render();return}
+  var dn=e.target.closest&&e.target.closest("[data-dnav]"); if(dn){
+    var vd2=visDays(), k=dn.dataset.dnav, ni=k==="today"?vd2.indexOf(todayIdx()):vd2.indexOf(sel)+(+k);
+    if(ni<0||ni>=vd2.length)ni=0; if(ni>=0&&vd2[ni]!==undefined){sel=vd2[ni];partRow=null;editing=null;render()}return}
   var ed=e.target.closest&&e.target.closest("[data-edit]"); if(ed){editing=+ed.dataset.edit;render();return}
   var b=e.target.closest&&e.target.closest("[data-act]"); if(b){
     var it=find(+b.dataset.row); if(!it)return;
