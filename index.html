@@ -125,6 +125,13 @@ h1{font-family:var(--font-display);font-size:26px;line-height:1.2;margin:0}
 .tick{width:30px;height:30px;border-radius:50%;border:2px solid var(--line);background:var(--bg);color:transparent;padding:0;display:flex;align-items:center;justify-content:center;flex:none;margin-top:2px}
 .tick svg{width:16px;height:16px;stroke-width:3}
 .tick:hover{border-color:var(--accent)}
+.tick.part{border-color:var(--accent);background:conic-gradient(var(--accent) calc(var(--f)*360deg),var(--bg) 0)}
+.item.partial .name{color:var(--muted)}
+.fr{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.fr .chip{border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:999px;padding:3px 12px;font-size:13px;min-height:28px}
+.fr .chip:hover,.fr .chip.on{border-color:var(--accent);color:var(--accent)}
+.fr .chip.on{font-weight:600}
+.fpart{color:var(--accent);font-weight:600}
 .tick[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
 .body{flex:1;min-width:0}
 .l1{display:flex;align-items:center;gap:4px}
@@ -379,9 +386,17 @@ var SEED=[
 ];
 var items=[];
 
+/* قيمة اليوم: 0 = لم يُنجز، أو كسر (ربع/نصف/…) حتى 1 = تم كاملًا. تُقبل القيم القديمة true/false */
+function dv(v){
+  if(v===true||String(v).toUpperCase()==="TRUE")return 1;
+  var n=typeof v==="number"?v:NaN;
+  return n>0?Math.min(1,Math.round(n*100)/100):0;
+}
+function fracName(v){return v>=1?"تم":v===0.25?"ربع":v===0.5?"نصف":v===0.75?"ثلاثة أرباع":Math.round(v*100)+"٪"}
+var partRow=null;
 function mk(r,row){
   return {row:row,type:String(r[0]||"").trim(),cls:String(r[1]||"").trim(),time:num(r[2]),weekly:num(r[3]),
-    qty:String(r[4]==null?"":r[4]),daily:num(r[5]),days:[0,1,2,3,4,5,6].map(function(k){var v=r[6+k];return v===true||v===1||String(v).toUpperCase()==="TRUE"}),
+    qty:String(r[4]==null?"":r[4]),daily:num(r[5]),days:[0,1,2,3,4,5,6].map(function(k){return dv(r[6+k])}),
     sched:normSched(r[13])};
 }
 /* sched: null = تلقائي (السبت إلى الخميس)، أو مصفوفة من 7 قيم صح/خطأ */
@@ -400,7 +415,7 @@ function schedText(it){
 }
 function num(v){var n=parseFloat(String(v).replace("٫",".").replace(",","."));return isNaN(n)?0:n}
 function esc(s){return String(s).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})}
-function pct(it){if(!it.weekly)return 0;var c=it.days.filter(Boolean).length;return Math.min(999,it.daily*c/it.weekly*100)}
+function pct(it){if(!it.weekly)return 0;var c=it.days.reduce(function(a,v){return a+dv(v)},0);return Math.min(999,it.daily*c/it.weekly*100)}
 function f1(x){return (Math.round(x*10)/10).toString().replace(".","٫")}
 function todayIdx(){var d=new Date().getDay();return d===6?0:(d===5?6:d+1)}
 function colorFor(p){return p>=100?"var(--good)":p>=50?"var(--accent)":p>0?"var(--warn)":"var(--line)"}
@@ -452,7 +467,7 @@ function render(){
   updateBell();
   var t=todayIdx(), vd=visDays();
   if(vd.indexOf(sel)<0)sel=0;
-  var dp=DAYS.map(function(_,d){var tot=0,done=0;items.forEach(function(i){if(active(i,d)){tot+=i.time;if(i.days[d])done+=i.time}});return tot?done/tot*100:0});
+  var dp=DAYS.map(function(_,d){var tot=0,done=0;items.forEach(function(i){if(active(i,d)){tot+=i.time;done+=i.time*dv(i.days[d])}});return tot?done/tot*100:0});
   var overall=vd.reduce(function(a,d){return a+dp[d]},0)/vd.length;
 
   document.getElementById("wTotal").textContent=f1(overall)+"%";
@@ -465,7 +480,7 @@ function render(){
   }).join("");
 
   var dayItems=items.filter(function(i){return active(i,sel)});
-  var doneN=dayItems.filter(function(i){return i.days[sel]}).length;
+  var doneN=dayItems.filter(function(i){return dv(i.days[sel])>=1}).length;
   document.getElementById("sub").textContent=(sel===t?"اليوم · ":"")+DAYS[sel]+" · أنجزت "+doneN+" من "+dayItems.length;
 
   var order=[], by={};
@@ -477,18 +492,21 @@ function render(){
   var q=document.querySelector(".qin"); if(q){q.focus();q.select()}
 }
 function rowHtml(i){
-  var p=pct(i), on=i.days[sel];
+  var p=pct(i), fv=dv(i.days[sel]), on=fv>=1, part=fv>0&&fv<1;
   var qty=editing===i.row
     ? '<input class="qin" id="qin" data-row="'+i.row+'" value="'+esc(i.qty)+'" aria-label="الكم">'
     : '<button type="button" class="qty'+(i.qty?'':' empty')+'" data-edit="'+i.row+'" title="تعديل الكم">'+(i.qty?esc(i.qty):'الكم')+'</button>';
-  return '<div class="item'+(on?' done':'')+'">'+
-    '<button type="button" class="tick" data-row="'+i.row+'" aria-pressed="'+on+'" aria-label="تم في '+DAYS[sel]+'">'+ICON_CHECK+'</button>'+
+  var fr=partRow===i.row?'<div class="fr">'+[[0.25,"ربع"],[0.5,"نصف"],[0.75,"ثلاثة أرباع"],[1,"تم كاملًا"],[0,"مسح"]].map(function(o){
+      return '<button type="button" class="chip'+(fv===o[0]?' on':'')+'" data-frac="'+o[0]+'" data-row="'+i.row+'">'+o[1]+'</button>'}).join("")+'</div>':'';
+  return '<div class="item'+(on?' done':'')+(part?' partial':'')+'">'+
+    '<button type="button" class="tick'+(part?' part':'')+'"'+(part?' style="--f:'+fv+'"':'')+' data-row="'+i.row+'" aria-pressed="'+on+'" aria-label="تم في '+DAYS[sel]+'">'+ICON_CHECK+'</button>'+
     '<div class="body">'+
       '<div class="l1"><span class="name">'+esc(i.cls)+'</span>'+
+        '<button type="button" class="icon sm" data-act="part" data-row="'+i.row+'" aria-label="تعليم جزء من الهدف (ربع أو نصف)" title="تعليم ربع أو نصف" style="font-size:15px;font-weight:600">½</button>'+
         '<button type="button" class="icon sm" data-act="edit" data-row="'+i.row+'" aria-label="تعديل الهدف">'+ICON_EDIT+'</button>'+
         '<button type="button" class="icon sm del" data-act="del" data-row="'+i.row+'" aria-label="حذف الهدف">'+ICON_DEL+'</button></div>'+
-      '<div class="l2">'+qty+'<span>'+i.time+' د</span>'+(i.sched?'<span class="sdays" title="أيام الهدف">'+esc(schedText(i))+'</span>':'')+'<span class="pct">'+f1(p)+'%</span></div>'+
-      '<div class="track"><i style="width:'+Math.min(100,p)+'%;background:'+colorFor(p)+'"></i></div>'+
+      '<div class="l2">'+qty+'<span>'+i.time+' د</span>'+(part?'<span class="fpart">'+fracName(fv)+' ('+f1(i.time*fv)+' د)</span>':'')+(i.sched?'<span class="sdays" title="أيام الهدف">'+esc(schedText(i))+'</span>':'')+'<span class="pct">'+f1(p)+'%</span></div>'+
+      '<div class="track"><i style="width:'+Math.min(100,p)+'%;background:'+colorFor(p)+'"></i></div>'+fr+
     '</div></div>';
 }
 
@@ -536,7 +554,7 @@ async function call(name){
   switch(name){
     case "api_init":
       return {email:user,url:null,rows:it.map(function(v,i){return {row:i+2,v:v}})};
-    case "api_setDay": at(a[0])[6+Number(a[1])]=!!a[2]; break;
+    case "api_setDay": at(a[0])[6+Number(a[1])]=dv(a[2]); break;
     case "api_setQty": at(a[0])[4]=String(a[1]||""); break;
     case "api_addGoal":
       if(it.length>=40)throw new Error("وصلت للحد الأقصى: 40 هدفًا.");
@@ -554,7 +572,7 @@ async function call(name){
       break;
     case "api_history":
       var w={};
-      d.hist.forEach(function(h){(w[h.date]=w[h.date]||[]).push({type:h.type,cls:h.cls,time:Number(h.time)||0,weekly:Number(h.weekly)||0,daily:Number(h.daily)||0,days:(h.days||[]).map(function(x){return x===true}),sched:normSched(h.sched)})});
+      d.hist.forEach(function(h){(w[h.date]=w[h.date]||[]).push({type:h.type,cls:h.cls,time:Number(h.time)||0,weekly:Number(h.weekly)||0,daily:Number(h.daily)||0,days:(h.days||[]).map(dv),sched:normSched(h.sched)})});
       return w;
     default: throw new Error("طلب غير معروف.");
   }
@@ -653,12 +671,16 @@ async function write(fn,args){
 function need(){if(!mcp){banner("وضع العرض: التغيير مؤقت ولا يُحفظ.")}return !!mcp}
 function find(row){return items.filter(function(i){return i.row===row})[0]}
 
-async function toggle(row,d){
+async function setFrac(row,d,nv){
   var it=find(row); if(!it)return;
-  var nv=!it.days[d]; it.days[d]=nv; render();
+  var old=dv(it.days[d]); nv=dv(nv); it.days[d]=nv; render();
   if(!need())return;
   var ok=await write("api_setDay",[row,d,nv]);
-  if(!ok){it.days[d]=!nv;render()}
+  if(!ok){it.days[d]=old;render()}
+}
+function toggle(row,d){
+  var it=find(row); if(!it)return;
+  return setFrac(row,d,dv(it.days[d])>=1?0:1);
 }
 async function saveQty(row,val){
   var it=find(row); editing=null; if(!it){render();return}
@@ -755,7 +777,7 @@ async function readHistory(){
   return {weeks:w||{}};
 }
 function weekStats(rows){
-  var dp=[0,1,2,3,4,5,6].map(function(d){var tot=0,done=0;rows.forEach(function(i){var on=i.sched?!!i.sched[d]:d<6;if(on||i.days[d]){tot+=i.time;if(i.days[d])done+=i.time}});return tot?done/tot*100:0});
+  var dp=[0,1,2,3,4,5,6].map(function(d){var tot=0,done=0;rows.forEach(function(i){var on=i.sched?!!i.sched[d]:d<6;if(on||i.days[d]){tot+=i.time;done+=i.time*dv(i.days[d])}});return tot?done/tot*100:0});
   var vd=[0,1,2,3,4,5].concat(dp[6]>0||rows.some(function(i){return i.sched&&i.sched[6]})?[6]:[]);
   return {dp:dp,overall:vd.reduce(function(a,d){return a+dp[d]},0)/vd.length};
 }
@@ -765,7 +787,7 @@ async function newWeek(date){
   try{
     var r=await call("api_newWeek",date);
     if(r&&r.dup){setStatus("err","لم يُحفظ");banner("أسبوع "+fmtDate(date)+" محفوظ في السجل من قبل. اختر تاريخًا آخر ثم أعد المحاولة.");return}
-    items.forEach(function(i){i.days=[false,false,false,false,false,false,false]});
+    items.forEach(function(i){i.days=[0,0,0,0,0,0,0]});
     hist=null; banner(""); render(); sync();
   }catch(e){setStatus("err","تعذّر الحفظ");banner(explain(e)+" لم يُمسح شيء.")}
 }
@@ -814,13 +836,13 @@ function renderCal(){
     var m=calSel.split("-"), full=new Date(+m[0],+m[1]-1,+m[2]).toLocaleDateString("ar-EG",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
     if(r){
       var drows=r.rows.filter(function(x){return (x.sched?!!x.sched[r.d]:r.d<6)||x.days[r.d]});
-      var done=drows.filter(function(x){return x.days[r.d]}).length;
+      var done=drows.filter(function(x){return dv(x.days[r.d])>=1}).length;
       html+='<div class="dh"><strong>'+full+'</strong><span class="pp">'+f1(r.pct)+'%</span></div><div class="s">أنجزت '+done+' من '+drows.length+' بالوقت</div><table class="htab"><tbody>';
       var last=null;
       drows.forEach(function(x){
         if(x.type!==last){last=x.type;html+='<tr class="tg"><td colspan="3">'+esc(x.type)+'</td></tr>'}
-        var on=x.days[r.d];
-        html+='<tr><td style="width:28px"><span class="mk'+(on?' on':'')+'"></span></td><td'+(on?'':' style="color:var(--muted)"')+'>'+esc(x.cls)+'</td><td style="width:56px;color:var(--muted)">'+x.time+' د</td></tr>';
+        var fv=dv(x.days[r.d]), on=fv>0;
+        html+='<tr><td style="width:28px"><span class="mk'+(fv>=1?' on':'')+'"'+(fv>0&&fv<1?' style="border-color:var(--accent);background:conic-gradient(var(--accent) '+fv*360+'deg,var(--bg) 0)"':'')+'></span></td><td'+(on?'':' style="color:var(--muted)"')+'>'+esc(x.cls)+(fv>0&&fv<1?' <span class="fpart">· '+fracName(fv)+'</span>':'')+'</td><td style="width:56px;color:var(--muted)">'+x.time+' د</td></tr>';
       });
       html+='</tbody></table>';
     }else html+='<div class="dh"><strong>'+full+'</strong></div><div class="hnote">لا يوجد تسجيل لهذا اليوم.</div>';
@@ -984,12 +1006,14 @@ document.getElementById("outBtn").addEventListener("click",async function(){
 });
 /* أحداث القائمة الرئيسية */
 document.addEventListener("click",function(e){
-  var tk=e.target.closest&&e.target.closest(".tick"); if(tk){toggle(+tk.dataset.row,sel);return}
-  var tab=e.target.closest&&e.target.closest("[data-tab]"); if(tab){sel=+tab.dataset.tab;render();return}
+  var fc=e.target.closest&&e.target.closest("[data-frac]"); if(fc){partRow=null;setFrac(+fc.dataset.row,sel,+fc.dataset.frac);return}
+  var tk=e.target.closest&&e.target.closest(".tick"); if(tk){partRow=null;toggle(+tk.dataset.row,sel);return}
+  var tab=e.target.closest&&e.target.closest("[data-tab]"); if(tab){sel=+tab.dataset.tab;partRow=null;render();return}
   var ed=e.target.closest&&e.target.closest("[data-edit]"); if(ed){editing=+ed.dataset.edit;render();return}
   var b=e.target.closest&&e.target.closest("[data-act]"); if(b){
     var it=find(+b.dataset.row); if(!it)return;
-    if(b.dataset.act==="edit"){openForm(it)}
+    if(b.dataset.act==="part"){partRow=partRow===it.row?null:it.row;render()}
+    else if(b.dataset.act==="edit"){openForm(it)}
     else{delRow=it.row;document.getElementById("delMsg").textContent=it.type+" · "+it.cls;delDlg.showModal()}
   }
 });
