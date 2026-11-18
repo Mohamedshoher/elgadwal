@@ -43,7 +43,7 @@ button{font:inherit;color:inherit;cursor:pointer}
 svg{display:block;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 
 .app{display:grid;grid-template-columns:272px minmax(0,1fr);min-height:100%}
-.main{padding:16px 16px 0;max-width:720px;width:100%;margin:0 auto}
+.main{padding:16px 16px 96px;max-width:720px;width:100%;margin:0 auto}
 
 /* القائمة الجانبية */
 .drawer{background:var(--surface);border-inline-end:1px solid var(--line);padding:16px;display:flex;flex-direction:column;gap:14px;position:sticky;top:0;align-self:start;height:100vh;overflow:auto}
@@ -132,13 +132,24 @@ h1{font-family:var(--font-display);font-size:26px;line-height:1.2;margin:0}
 .fr .chip:hover,.fr .chip.on{border-color:var(--accent);color:var(--accent)}
 .fr .chip.on{font-weight:600}
 .fpart{color:var(--accent);font-weight:600}
-.fr.sec{margin-top:4px}
+.opanel{margin-top:8px;padding:10px;border:1px solid var(--line);border-radius:12px;background:var(--bg)}
+.opanel h5{margin:0 0 8px;font-size:12px;font-weight:600;color:var(--muted)}
+.opanel .fr{margin-top:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(84px,1fr))}
+.opanel .fr .chip{border-radius:10px;text-align:center}
+.opts{display:flex;flex-direction:column;gap:6px}
+.opt{display:flex;align-items:center;gap:10px;width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:10px;background:var(--surface);text-align:start}
+.opt svg{width:20px;height:20px;flex:none}
+.opt b{display:block;font-weight:600;font-size:14px}
+.opt small{display:block;color:var(--muted);font-size:12px;line-height:1.4}
+.opt.warn:hover{border-color:var(--warn);color:var(--warn)}
+.opt.bad:hover{border-color:var(--bad);color:var(--bad)}
 .fr .chip.warn:hover{border-color:var(--warn);color:var(--warn)}
 .fr .chip.bad:hover{border-color:var(--bad);color:var(--bad)}
 .vnote{padding:8px 4px 0;font-size:13px;color:var(--muted)}
 .vrow .name{text-decoration:none}
 .foot{padding-bottom:6px}
-.fnav{position:sticky;bottom:0;display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-bottom:0;border-radius:16px 16px 0 0;padding:6px 6px calc(6px + env(safe-area-inset-bottom));margin-top:12px;box-shadow:0 -4px 14px rgba(0,0,0,.06);z-index:5}
+.fwrap{position:fixed;bottom:0;left:0;right:272px;z-index:15;pointer-events:none;padding:0 12px}
+.fnav{pointer-events:auto;max-width:720px;margin:0 auto;display:flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-bottom:0;border-radius:16px 16px 0 0;padding:6px 6px calc(6px + env(safe-area-inset-bottom));box-shadow:0 -4px 14px rgba(0,0,0,.08)}
 .fnav button{flex:1;display:flex;flex-direction:column;align-items:center;gap:1px;padding:5px 2px;border:0;border-radius:11px;background:none;color:var(--muted);font-size:12px;position:relative;min-height:48px}
 .fnav button svg{width:22px;height:22px}
 .fnav button[aria-pressed="true"]{background:var(--accent-soft);color:var(--accent);font-weight:600}
@@ -239,7 +250,8 @@ a.mbtn[hidden]{display:none}
   .scrim.show{opacity:1;pointer-events:auto}
   #menuBtn{display:inline-flex}
   .topdot{display:block}
-  .main{padding:12px 12px 48px}
+  .main{padding:12px 12px 96px}
+  .fwrap{right:0!important}
 }
 @media (max-width:420px){
   h1{font-size:22px}
@@ -318,12 +330,12 @@ a.mbtn[hidden]{display:none}
     <nav class="tabs" id="tabs" role="tablist" aria-label="أيام الأسبوع"></nav>
     <main id="groups"></main>
     <p class="foot">اسحب من الحافة اليمنى لفتح القائمة. بياناتك محفوظة على هذا الجهاز تحت اسمك. صدّر نسخة احتياطية قبل تغيير الجهاز.</p>
-    <nav class="fnav" id="fnav" aria-label="تصنيف الأهداف">
+    <div class="fwrap"><nav class="fnav" id="fnav" aria-label="تصنيف الأهداف">
       <button type="button" data-view="main" aria-pressed="true"><svg viewBox="0 0 24 24"><path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/></svg><span>الأهداف</span></button>
       <button type="button" data-view="done" aria-pressed="false"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l3 3 5-6"/></svg><span>المكتملة</span><i class="n" id="nDone" hidden></i></button>
       <button type="button" data-view="later" aria-pressed="false"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span>المؤجلة</span><i class="n" id="nLater" hidden></i></button>
       <button type="button" data-view="cancel" aria-pressed="false"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9 9l6 6M15 9l-6 6"/></svg><span>الملغية</span><i class="n" id="nCancel" hidden></i></button>
-    </nav>
+    </nav></div>
   </div>
 </div>
 
@@ -411,7 +423,8 @@ function dv(v){
   return n>0?Math.min(1,Math.round(n*100)/100):0;
 }
 function fracName(v){return v>=1?"تم":v===0.25?"ربع":v===0.5?"نصف":v===0.75?"ثلاثة أرباع":Math.round(v*100)+"٪"}
-var partRow=null, view="main";
+var ICON_X='<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9 9l6 6M15 9l-6 6"/></svg>', ICON_CLOCK='<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>';
+var partRow=null, partMode="f", view="main";
 var VIEWS={done:"المكتملة",later:"المؤجلة للأسبوع القادم",cancel:"الملغية"};
 function mk(r,row){
   return {row:row,type:String(r[0]||"").trim(),cls:String(r[1]||"").trim(),time:num(r[2]),weekly:num(r[3]),
@@ -530,14 +543,18 @@ function rowHtml(i){
   var qty=editing===i.row
     ? '<input class="qin" id="qin" data-row="'+i.row+'" value="'+esc(i.qty)+'" aria-label="الكم">'
     : '<button type="button" class="qty'+(i.qty?'':' empty')+'" data-edit="'+i.row+'" title="تعديل الكم">'+(i.qty?esc(i.qty):'الكم')+'</button>';
-  var fr=partRow===i.row?'<div class="fr">'+[[0.25,"ربع"],[0.5,"نصف"],[0.75,"ثلاثة أرباع"],[1,"تم كاملًا"],[0,"مسح"]].map(function(o){
-      return '<button type="button" class="chip'+(fv===o[0]?' on':'')+'" data-frac="'+o[0]+'" data-row="'+i.row+'">'+o[1]+'</button>'}).join("")+'</div>'+
-      '<div class="fr sec"><button type="button" class="chip warn" data-st="p" data-row="'+i.row+'">تأجيل للأسبوع القادم</button><button type="button" class="chip bad" data-st="c" data-row="'+i.row+'">إلغاء الهدف</button></div>':'';
+  var fr='';
+  if(partRow===i.row&&partMode==="f")fr='<div class="opanel"><h5>كم أنجزت من هذا الهدف؟</h5><div class="fr">'+[[0.25,"ربع"],[0.5,"نصف"],[0.75,"ثلاثة أرباع"],[1,"تم كاملًا"],[0,"مسح"]].map(function(o){
+      return '<button type="button" class="chip'+(fv===o[0]&&fv>0?' on':'')+'" data-frac="'+o[0]+'" data-row="'+i.row+'">'+o[1]+'</button>'}).join("")+'</div></div>';
+  else if(partRow===i.row)fr='<div class="opanel"><h5>تأجيل الهدف أو إلغاؤه</h5><div class="opts">'+
+      '<button type="button" class="opt warn" data-st="p" data-row="'+i.row+'">'+ICON_CLOCK+'<span><b>تأجيل للأسبوع القادم</b><small>يختفي الآن ويعود تلقائيًا عند بدء الأسبوع الجديد</small></span></button>'+
+      '<button type="button" class="opt bad" data-st="c" data-row="'+i.row+'">'+ICON_X+'<span><b>إلغاء الهدف</b><small>ينتقل إلى «الملغية» ويمكن استرجاعه</small></span></button></div></div>';
   return '<div class="item'+(on?' done':'')+(part?' partial':'')+'">'+
     '<button type="button" class="tick'+(part?' part':'')+'"'+(part?' style="--f:'+fv+'"':'')+' data-row="'+i.row+'" aria-pressed="'+on+'" aria-label="تم في '+DAYS[sel]+'">'+ICON_CHECK+'</button>'+
     '<div class="body">'+
       '<div class="l1"><span class="name">'+esc(i.cls)+'</span>'+
-        '<button type="button" class="icon sm" data-act="part" data-row="'+i.row+'" aria-label="تعليم جزء أو تأجيل أو إلغاء" title="ربع/نصف، تأجيل، إلغاء" style="font-size:18px;font-weight:700;line-height:1">⋯</button>'+
+        '<button type="button" class="icon sm" data-act="part" data-row="'+i.row+'" aria-label="تعليم ربع أو نصف" title="تعليم ربع أو نصف" style="font-size:15px;font-weight:700">½</button>'+
+        '<button type="button" class="icon sm" data-act="more" data-row="'+i.row+'" aria-label="تأجيل أو إلغاء الهدف" title="تأجيل أو إلغاء">'+ICON_X+'</button>'+
         '<button type="button" class="icon sm" data-act="edit" data-row="'+i.row+'" aria-label="تعديل الهدف">'+ICON_EDIT+'</button>'+
         '<button type="button" class="icon sm del" data-act="del" data-row="'+i.row+'" aria-label="حذف الهدف">'+ICON_DEL+'</button></div>'+
       '<div class="l2">'+qty+'<span>'+i.time+' د</span>'+(part?'<span class="fpart">'+fracName(fv)+' ('+f1(i.time*fv)+' د)</span>':'')+(i.sched?'<span class="sdays" title="أيام الهدف">'+esc(schedText(i))+'</span>':'')+'<span class="pct">'+f1(p)+'%</span></div>'+
@@ -1070,7 +1087,7 @@ document.addEventListener("click",function(e){
   var ed=e.target.closest&&e.target.closest("[data-edit]"); if(ed){editing=+ed.dataset.edit;render();return}
   var b=e.target.closest&&e.target.closest("[data-act]"); if(b){
     var it=find(+b.dataset.row); if(!it)return;
-    if(b.dataset.act==="part"){partRow=partRow===it.row?null:it.row;render()}
+    if(b.dataset.act==="part"||b.dataset.act==="more"){var m=b.dataset.act==="part"?"f":"m";partRow=(partRow===it.row&&partMode===m)?null:it.row;partMode=m;render()}
     else if(b.dataset.act==="edit"){openForm(it)}
     else{delRow=it.row;document.getElementById("delMsg").textContent=it.type+" · "+it.cls;delDlg.showModal()}
   }
