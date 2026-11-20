@@ -426,7 +426,7 @@ function fracName(v){return v>=1?"تم":v===0.25?"ربع":v===0.5?"نصف":v===0
 var ICON_X='<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9 9l6 6M15 9l-6 6"/></svg>', ICON_CLOCK='<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>';
 var PALETTE=["#0f8f7a","#2f7fd1","#8a5cd6","#d6527f","#d9534f","#e0872a","#b8962b","#4a9d3f"];
 var PALNAMES=["أخضر مزرق","أزرق","بنفسجي","وردي","أحمر","برتقالي","ذهبي","أخضر"];
-var colors={}, palType=null, wkStart="";
+var colors={}, palType=null, wkStart="", sawLoad=false;
 function typeColor(t){
   var c=colors[t];
   if(typeof c==="number"&&c>=0&&c<PALETTE.length)return c;
@@ -470,7 +470,7 @@ function f1(x){return (Math.round(x*10)/10).toString().replace(".","٫")}
 function todayIdx(){var d=new Date().getDay();return d===6?0:(d===5?6:d+1)}
 function colorFor(p){return p>=100?"var(--good)":p>=50?"var(--accent)":p>0?"var(--warn)":"var(--line)"}
 function find(row){return items.filter(function(i){return i.row===row})[0]}
-sel=todayIdx(); if(sel>5)sel=0;
+sel=todayIdx();
 
 var ICON_CHECK='<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
 var ICON_EDIT='<svg viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4"/></svg>';
@@ -758,7 +758,7 @@ async function load(){
   try{
     var rr=await call("api_rollover",currentWeekStart());
     var d=await call("api_init");
-    items=(d.rows||[]).map(function(r){return mk(r.v,r.row)}); colors=d.colors||{}; wkStart=d.weekStart||"";
+    items=(d.rows||[]).map(function(r){return mk(r.v,r.row)}); colors=d.colors||{}; wkStart=d.weekStart||""; if(!sawLoad){sawLoad=true;sel=todayIdx()}
     if(rr&&rr.rolled){hist=null;weekNote="بدأ أسبوع جديد، وحُفظ أسبوع "+fmtDate(rr.date)+" في السجل."}
     setAccount(d); banner(weekNote); weekNote=""; render(); sync();
   }catch(e){setStatus("err","تعذّر التحديث");banner(explain(e));render()}
