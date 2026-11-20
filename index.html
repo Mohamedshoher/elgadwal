@@ -442,12 +442,15 @@ function groupHead(g,right){
     return '<button type="button" class="sw'+(k===c?' on':'')+'" style="background:'+col+'" data-pick="'+k+'" data-type="'+encodeURIComponent(g)+'" aria-label="'+PALNAMES[k]+'" aria-pressed="'+(k===c)+'"></button>'}).join("")+'</div>';
   return head;
 }
+var ICON_NEXT='<svg viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>';
+function dayLabel(d){return DAYS[d%7]+" · "+dayDate(d).toLocaleDateString("ar-EG",{day:"numeric",month:"long"})+(d>=7&&sel<7?" · الأسبوع القادم":"")}
 var partRow=null, partMode="f", view="main";
 var VIEWS={done:"المكتملة",later:"المؤجلة للأسبوع القادم",cancel:"الملغية"};
 function mk(r,row){
   return {row:row,type:String(r[0]||"").trim(),cls:String(r[1]||"").trim(),time:num(r[2]),weekly:num(r[3]),
     qty:String(r[4]==null?"":r[4]),daily:num(r[5]),days:[0,1,2,3,4,5,6].map(function(k){return dv(r[6+k])}),
-    sched:normSched(r[13]),st:r[14]==='c'||r[14]==='p'?r[14]:''};
+    sched:normSched(r[13]),st:r[14]==='c'||r[14]==='p'?r[14]:'',
+    nd:[0,1,2,3,4,5,6].map(function(k){return dv(Array.isArray(r[15])?r[15][k]:0)}),ov:normOv(r[16],14)};
 }
 /* sched: null = تلقائي (السبت إلى الخميس)، أو مصفوفة من 7 قيم صح/خطأ */
 function normSched(v){
@@ -455,11 +458,16 @@ function normSched(v){
   var a=[0,1,2,3,4,5,6].map(function(k){return v[k]===true});
   return a.some(Boolean)?a:null;
 }
-function active(it,d){return !it.st&&(it.sched?!!it.sched[d]:d<6)}
+function baseOn(sc,d){return sc?!!sc[d]:d<6}
+function normOv(v,n){var a=[];for(var k=0;k<n;k++){var x=Array.isArray(v)?Number(v[k]):0;a.push(x===1?1:x===-1?-1:0)}return a}
+function rowOn(i,d){var o=i.ov&&i.ov[d];return o===-1?false:o===1?true:baseOn(i.sched,d%7)}
+function dayv(i,d){return dv(d<7?i.days[d]:i.nd[d-7])}
+function setDv(i,d,v){if(d<7)i.days[d]=v;else i.nd[d-7]=v}
+function active(it,d){return !it.st&&rowOn(it,d)}
 function hasFri(){return items.some(function(i){return active(i,6)})}
-function visDays(){return hasFri()?[0,1,2,3,4,5,6]:[0,1,2,3,4,5]}
-function planned(i,d){return i.st!=='c'&&(i.sched?!!i.sched[d]:d<6)}
-function nextDays(){return items.some(function(i){return planned(i,6)})?[0,1,2,3,4,5,6]:[0,1,2,3,4,5]}
+function visDays(){return hasFri()||sel===6||todayIdx()===6?[0,1,2,3,4,5,6]:[0,1,2,3,4,5]}
+function planned(i,d){return i.st!=='c'&&rowOn(i,d)}
+function nextDays(){return sel===13||items.some(function(i){return planned(i,13)})?[0,1,2,3,4,5,6]:[0,1,2,3,4,5]}
 function navDays(){return visDays().concat(nextDays().map(function(d){return d+7}))}
 function schedText(it){
   if(!it.sched)return "";
@@ -468,7 +476,7 @@ function schedText(it){
 }
 function num(v){var n=parseFloat(String(v).replace("٫",".").replace(",","."));return isNaN(n)?0:n}
 function esc(s){return String(s).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})}
-function pct(it){if(!it.weekly)return 0;var c=it.days.reduce(function(a,v){return a+dv(v)},0);return Math.min(999,it.daily*c/it.weekly*100)}
+function pct(it,wk){if(!it.weekly)return 0;var c=(wk?it.nd:it.days).reduce(function(a,v){return a+dv(v)},0);return Math.min(999,it.daily*c/it.weekly*100)}
 function f1(x){return (Math.round(x*10)/10).toString().replace(".","٫")}
 function todayIdx(){var d=new Date().getDay();return d===6?0:(d===5?6:d+1)}
 function colorFor(p){return p>=100?"var(--good)":p>=50?"var(--accent)":p>0?"var(--warn)":"var(--line)"}
@@ -529,37 +537,30 @@ function render(){
   }).join("");
 
   var vi=nd.indexOf(sel), nx=sel>=7, dd=sel%7;
+  function dayPct(d){var tot=0,done=0;items.forEach(function(i){if(d<7?active(i,d):planned(i,d)){tot+=i.time;done+=i.time*dayv(i,d)}});return tot?done/tot*100:0}
   document.getElementById("tabs").innerHTML=
     '<button type="button" class="tarr" data-dnav="-1" aria-label="اليوم السابق"'+(vi<=0?' disabled':'')+'><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>'+
-    '<button type="button" class="tab'+(sel===t?' today':'')+'" role="tab" aria-selected="true" data-dnav="today" title="العودة إلى اليوم"><span class="n">'+(nx?"الأسبوع القادم · ":(sel===t?"اليوم · ":""))+DAYS[dd]+'</span><span class="p">'+dayDate(sel).toLocaleDateString("ar-EG",{day:"numeric",month:"long"})+' · '+(nx?'خطة':f1(dp[sel])+'%')+'</span></button>'+
+    '<button type="button" class="tab'+(sel===t?' today':'')+'" role="tab" aria-selected="true" data-dnav="today" title="العودة إلى اليوم"><span class="n">'+(nx?"الأسبوع القادم · ":(sel===t?"اليوم · ":""))+DAYS[dd]+'</span><span class="p">'+dayDate(sel).toLocaleDateString("ar-EG",{day:"numeric",month:"long"})+' · '+f1(dayPct(sel))+'%'+'</span></button>'+
     '<button type="button" class="tarr" data-dnav="1" aria-label="اليوم التالي"'+(vi>=nd.length-1?' disabled':'')+'><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button>';
-  var live=items.filter(function(i){return !i.st}), isDone=function(i){return pct(i)>=100-1e-9};
-  var cDone=live.filter(isDone).length, cLater=items.filter(function(i){return i.st==='p'}).length, cCancel=items.filter(function(i){return i.st==='c'}).length;
+  var wk=sel>=7?1:0, dd=sel%7;
+  var live0=items.filter(function(i){return !i.st}), isDone0=function(i){return pct(i,0)>=100-1e-9};
+  var cDone=live0.filter(isDone0).length, cLater=items.filter(function(i){return i.st==='p'}).length, cCancel=items.filter(function(i){return i.st==='c'}).length;
   [["nDone",cDone],["nLater",cLater],["nCancel",cCancel]].forEach(function(x){var e=document.getElementById(x[0]);e.textContent=x[1];e.hidden=!x[1]});
   document.querySelectorAll("#fnav [data-view]").forEach(function(b){b.setAttribute("aria-pressed",String(b.dataset.view===view))});
   document.getElementById("tabs").hidden=view!=="main";
   if(view!=="main"){
-    var vl=view==="done"?live.filter(isDone):items.filter(function(i){return i.st===(view==="later"?"p":"c")});
+    var vl=view==="done"?live0.filter(isDone0):items.filter(function(i){return i.st===(view==="later"?"p":"c")});
     var note=view==="done"?"أهداف بلغت 100٪ من هدفها الأسبوعي.":view==="later"?"تعود هذه الأهداف إلى قائمتك تلقائيًا عند بدء الأسبوع الجديد، ولا تدخل في نسبة هذا الأسبوع.":"أهداف ملغاة: لا تدخل في النسب ولا تظهر في القائمة، ويمكنك استرجاعها.";
     document.getElementById("sub").textContent=VIEWS[view]+" · "+vl.length;
     document.getElementById("groups").innerHTML='<div class="vnote">'+note+'</div>'+(vl.length?'<div class="gh"><strong>'+VIEWS[view]+'</strong><span>'+vl.length+'</span></div><div class="card">'+vl.map(vrowHtml).join("")+'</div>':'<div class="empty-note">لا توجد أهداف هنا.</div>');
     return;
   }
-  if(sel>=7){
-    var pv=items.filter(function(i){return planned(i,dd)}), po={}, pg=[];
-    pv.forEach(function(i){if(!po[i.type]){po[i.type]=[];pg.push(i.type)}po[i.type].push(i)});
-    document.getElementById("sub").textContent="الأسبوع القادم · "+DAYS[dd]+" · "+pv.length+(pv.length>10?" هدفًا":pv.length===1?" هدف":" أهداف");
-    document.getElementById("groups").innerHTML='<div class="vnote">معاينة وتخطيط: هذه أهداف الأسبوع القادم بحسب أيام كل هدف، وتشمل المؤجَّلة من هذا الأسبوع. يبدأ التعليم عند دخول الأسبوع.</div>'+(pv.length?pg.map(function(g){
-      var l=po[g], m=l.reduce(function(a,i){return a+i.time},0);
-      return groupHead(g,m+' دقيقة')+'<div class="card">'+l.map(prevHtml).join("")+'</div>';
-    }).join(""):'<div class="empty-note">لا توجد أهداف في هذا اليوم من الأسبوع القادم.</div>');
-    return;
-  }
-  var dayItems=live.filter(function(i){return active(i,sel)});
-  var doneN=dayItems.filter(function(i){return dv(i.days[sel])>=1}).length;
-  document.getElementById("sub").textContent=(sel===t?"اليوم · ":"")+DAYS[sel]+" · أنجزت "+doneN+" من "+dayItems.length;
+  var live=wk?items.filter(function(i){return i.st!=='c'}):live0, isDone=function(i){return pct(i,wk)>=100-1e-9};
+  var dayItems=live.filter(function(i){return wk?planned(i,sel):active(i,sel)});
+  var doneN=dayItems.filter(function(i){return dayv(i,sel)>=1}).length;
+  document.getElementById("sub").textContent=(wk?"الأسبوع القادم · ":(sel===t?"اليوم · ":""))+DAYS[dd]+" · أنجزت "+doneN+" من "+dayItems.length;
   var cand=dayItems.filter(function(i){return !isDone(i)});
-  var todo=cand.filter(function(i){return dv(i.days[sel])<1}), doneToday=cand.filter(function(i){return dv(i.days[sel])>=1});
+  var todo=cand.filter(function(i){return dayv(i,sel)<1}), doneToday=cand.filter(function(i){return dayv(i,sel)>=1});
   var order=[], by={};
   todo.forEach(function(i){if(!by[i.type]){by[i.type]=[];order.push(i.type)}by[i.type].push(i)});
   var html=order.map(function(g){
@@ -576,38 +577,37 @@ function render(){
   var q=document.querySelector(".qin"); if(q){q.focus();q.select()}
 }
 function rowHtml(i){
-  var p=pct(i), fv=dv(i.days[sel]), on=fv>=1, part=fv>0&&fv<1;
+  var wk=sel>=7?1:0, p=pct(i,wk), fv=dayv(i,sel), on=fv>=1, part=fv>0&&fv<1;
   var qty=editing===i.row
     ? '<input class="qin" id="qin" data-row="'+i.row+'" value="'+esc(i.qty)+'" aria-label="الكم">'
     : '<button type="button" class="qty'+(i.qty?'':' empty')+'" data-edit="'+i.row+'" title="تعديل الكم">'+(i.qty?esc(i.qty):'الكم')+'</button>';
   var fr='';
   if(partRow===i.row&&partMode==="f")fr='<div class="opanel"><h5>كم أنجزت من هذا الهدف؟</h5><div class="fr">'+[[0.25,"ربع"],[0.5,"نصف"],[0.75,"ثلاثة أرباع"],[1,"تم كاملًا"],[0,"مسح"]].map(function(o){
       return '<button type="button" class="chip'+(fv===o[0]&&fv>0?' on':'')+'" data-frac="'+o[0]+'" data-row="'+i.row+'">'+o[1]+'</button>'}).join("")+'</div></div>';
+  else if(partRow===i.row&&partMode==="d"){
+    var mv=[1,2].filter(function(n){return sel+n<=13}).map(function(n){
+      return '<button type="button" class="opt" data-mv="'+n+'" data-row="'+i.row+'">'+ICON_NEXT+'<span><b>'+(n===1?"تأجيل إلى الغد":"تأجيل إلى بعد غد")+'</b><small>'+dayLabel(sel+n)+'</small></span></button>'}).join("");
+    fr='<div class="opanel"><h5>تأجيل هذا الهدف إلى يوم لاحق</h5>'+(fv>0?'<div class="vnote" style="padding:0">علّمت جزءًا من هذا الهدف في هذا اليوم، امسح التعليم أولًا ثم أجّله.</div>':mv?'<div class="opts">'+mv+'</div>':'<div class="vnote" style="padding:0">لا يوجد يوم لاحق متاح للتأجيل.</div>')+'</div>';
+  }
   else if(partRow===i.row)fr='<div class="opanel"><h5>تأجيل الهدف أو إلغاؤه</h5><div class="opts">'+
-      '<button type="button" class="opt warn" data-st="p" data-row="'+i.row+'">'+ICON_CLOCK+'<span><b>تأجيل للأسبوع القادم</b><small>يختفي الآن ويعود تلقائيًا عند بدء الأسبوع الجديد</small></span></button>'+
+      (wk||i.st==='p'?'':'<button type="button" class="opt warn" data-st="p" data-row="'+i.row+'">'+ICON_CLOCK+'<span><b>تأجيل للأسبوع القادم</b><small>يختفي الآن ويعود تلقائيًا عند بدء الأسبوع الجديد</small></span></button>')+
       '<button type="button" class="opt bad" data-st="c" data-row="'+i.row+'">'+ICON_X+'<span><b>إلغاء الهدف</b><small>ينتقل إلى «الملغية» ويمكن استرجاعه</small></span></button></div></div>';
   return '<div class="item'+(on?' done':'')+(part?' partial':'')+'" style="--tc:'+PALETTE[typeColor(i.type)]+'">'+
-    '<button type="button" class="tick'+(part?' part':'')+'"'+(part?' style="--f:'+fv+'"':'')+' data-row="'+i.row+'" aria-pressed="'+on+'" aria-label="تم في '+DAYS[sel]+'">'+ICON_CHECK+'</button>'+
+    '<button type="button" class="tick'+(part?' part':'')+'"'+(part?' style="--f:'+fv+'"':'')+' data-row="'+i.row+'" aria-pressed="'+on+'" aria-label="تم في '+DAYS[sel%7]+'">'+ICON_CHECK+'</button>'+
     '<div class="body">'+
       '<div class="l1"><span class="name">'+esc(i.cls)+'</span>'+
         '<button type="button" class="icon sm" data-act="part" data-row="'+i.row+'" aria-label="تعليم ربع أو نصف" title="تعليم ربع أو نصف" style="font-size:15px;font-weight:700">½</button>'+
+        '<button type="button" class="icon sm" data-act="later" data-row="'+i.row+'" aria-label="تأجيل إلى الغد أو بعد غد" title="تأجيل إلى الغد أو بعد غد">'+ICON_NEXT+'</button>'+
         '<button type="button" class="icon sm" data-act="more" data-row="'+i.row+'" aria-label="تأجيل أو إلغاء الهدف" title="تأجيل أو إلغاء">'+ICON_X+'</button>'+
         '<button type="button" class="icon sm" data-act="edit" data-row="'+i.row+'" aria-label="تعديل الهدف">'+ICON_EDIT+'</button>'+
         '<button type="button" class="icon sm del" data-act="del" data-row="'+i.row+'" aria-label="حذف الهدف">'+ICON_DEL+'</button></div>'+
-      '<div class="l2">'+qty+'<span>'+i.time+' د</span>'+(part?'<span class="fpart">'+fracName(fv)+' ('+f1(i.time*fv)+' د)</span>':'')+(i.sched?'<span class="sdays" title="أيام الهدف">'+esc(schedText(i))+'</span>':'')+'<span class="pct">'+f1(p)+'%</span></div>'+
+      '<div class="l2">'+qty+'<span>'+i.time+' د</span>'+(part?'<span class="fpart">'+fracName(fv)+' ('+f1(i.time*fv)+' د)</span>':'')+(i.st==='p'?'<span class="fpart">مؤجل من هذا الأسبوع</span>':'')+(i.sched?'<span class="sdays" title="أيام الهدف">'+esc(schedText(i))+'</span>':'')+'<span class="pct">'+f1(p)+'%</span></div>'+
       '<div class="track"><i style="width:'+Math.min(100,p)+'%;background:'+colorFor(p)+'"></i></div>'+fr+
     '</div></div>';
 }
 
-function prevHtml(i){
-  return '<div class="item vrow" style="--tc:'+PALETTE[typeColor(i.type)]+'"><div class="body">'+
-    '<div class="l1"><span class="name">'+esc(i.cls)+'</span>'+
-      '<button type="button" class="icon sm" data-act="edit" data-row="'+i.row+'" aria-label="تعديل الهدف">'+ICON_EDIT+'</button></div>'+
-    '<div class="l2">'+(i.qty?'<span>'+esc(i.qty)+'</span>':'')+'<span>'+i.time+' د</span>'+(i.st==='p'?'<span class="fpart">مؤجل من هذا الأسبوع</span>':'')+(i.sched?'<span class="sdays">'+esc(schedText(i))+'</span>':'')+'</div>'+
-    '</div></div>';
-}
 function vrowHtml(i){
-  var p=pct(i), acts=i.st==='c'?'<button type="button" class="chip" data-st="" data-row="'+i.row+'">استرجاع</button>'
+  var p=pct(i,0), acts=i.st==='c'?'<button type="button" class="chip" data-st="" data-row="'+i.row+'">استرجاع</button>'
     :i.st==='p'?'<button type="button" class="chip" data-st="" data-row="'+i.row+'">تفعيل الآن</button><button type="button" class="chip bad" data-st="c" data-row="'+i.row+'">إلغاء الهدف</button>'
     :'<button type="button" class="chip warn" data-st="p" data-row="'+i.row+'">تأجيل</button><button type="button" class="chip bad" data-st="c" data-row="'+i.row+'">إلغاء الهدف</button>';
   return '<div class="item vrow" style="--tc:'+PALETTE[typeColor(i.type)]+'"><div class="body">'+
@@ -656,8 +656,14 @@ async function call(name){
   var res=null;
   function archiveWeek(date){
     if(it.some(function(v){return v.slice(6,13).some(Boolean)}))
-      it.forEach(function(v){if(v[14]&&!v.slice(6,13).some(Boolean))return;d.hist.push({date:date,type:v[0],cls:v[1],time:v[2],weekly:v[3],daily:v[5],qty:v[4],days:v.slice(6,13),sched:v[13]||null})});
-    it.forEach(function(v){for(var k=6;k<13;k++)v[k]=false; if(v[14]==="p")v[14]=0});
+      it.forEach(function(v){if(v[14]&&!v.slice(6,13).some(Boolean))return;d.hist.push({date:date,type:v[0],cls:v[1],time:v[2],weekly:v[3],daily:v[5],qty:v[4],days:v.slice(6,13),sched:v[13]||null,ov:normOv(v[16],14).slice(0,7)})});
+    it.forEach(function(v){
+      var nd=Array.isArray(v[15])?v[15]:[], ov=normOv(v[16],14), no=[];
+      for(var k=0;k<7;k++){var x=dv(nd[k]);v[6+k]=x>0?x:false}
+      for(var q=0;q<14;q++)no.push(q<7?ov[q+7]:0);
+      if(v[14]===undefined)v[14]=0; if(v[14]==="p")v[14]=0;
+      v[15]=[0,0,0,0,0,0,0]; v[16]=no;
+    });
   }
   function at(row){var x=it[Number(row)-2];if(!x)throw new Error("الهدف غير موجود.");return x}
   function fill(x,g){
@@ -674,7 +680,18 @@ async function call(name){
       if(!ck||!(cv>=0&&cv<PALETTE.length))throw new Error("لون غير صحيح.");
       d.colors=d.colors||{}; d.colors[ck]=cv; break;
     case "api_setStatus": at(a[0])[14]=a[1]==="c"||a[1]==="p"?a[1]:0; break;
-    case "api_setDay": at(a[0])[6+Number(a[1])]=dv(a[2]); break;
+    case "api_setDay":
+      var sd=Number(a[1]), sx=at(a[0]);
+      if(!(sd>=0&&sd<=13))throw new Error("يوم غير صحيح.");
+      if(sd<7)sx[6+sd]=dv(a[2]);
+      else{var sn=[0,1,2,3,4,5,6].map(function(k){return Array.isArray(sx[15])?dv(sx[15][k]):0});sn[sd-7]=dv(a[2]);if(sx[14]===undefined)sx[14]=0;sx[15]=sn}
+      break;
+    case "api_moveDay":
+      var mf=Number(a[1]), mt=Number(a[2]), mx=at(a[0]);
+      if(!(mf>=0&&mt<=13&&mt>mf))throw new Error("يوم غير صحيح.");
+      var mo=normOv(mx[16],14); mo[mf]=-1; mo[mt]=1;
+      if(mx[14]===undefined)mx[14]=0; if(mx[15]===undefined)mx[15]=[0,0,0,0,0,0,0];
+      mx[16]=mo; break;
     case "api_setQty": at(a[0])[4]=String(a[1]||""); break;
     case "api_addGoal":
       if(it.length>=40)throw new Error("وصلت للحد الأقصى: 40 هدفًا.");
@@ -693,7 +710,7 @@ async function call(name){
       break;
     case "api_history":
       var w={};
-      d.hist.forEach(function(h){(w[h.date]=w[h.date]||[]).push({type:h.type,cls:h.cls,time:Number(h.time)||0,weekly:Number(h.weekly)||0,daily:Number(h.daily)||0,days:(h.days||[]).map(dv),sched:normSched(h.sched)})});
+      d.hist.forEach(function(h){(w[h.date]=w[h.date]||[]).push({type:h.type,cls:h.cls,time:Number(h.time)||0,weekly:Number(h.weekly)||0,daily:Number(h.daily)||0,days:(h.days||[]).map(dv),sched:normSched(h.sched),ov:normOv(h.ov,7)})});
       return w;
     default: throw new Error("طلب غير معروف.");
   }
@@ -798,14 +815,21 @@ function find(row){return items.filter(function(i){return i.row===row})[0]}
 
 async function setFrac(row,d,nv){
   var it=find(row); if(!it)return;
-  var old=dv(it.days[d]); nv=dv(nv); it.days[d]=nv; render();
+  var old=dayv(it,d); nv=dv(nv); setDv(it,d,nv); render();
   if(!need())return;
   var ok=await write("api_setDay",[row,d,nv]);
-  if(!ok){it.days[d]=old;render()}
+  if(!ok){setDv(it,d,old);render()}
 }
 function toggle(row,d){
   var it=find(row); if(!it)return;
-  return setFrac(row,d,dv(it.days[d])>=1?0:1);
+  return setFrac(row,d,dayv(it,d)>=1?0:1);
+}
+async function moveDay(row,from,to){
+  var it=find(row); if(!it||to>13||to<=from)return;
+  var old=it.ov.slice(); it.ov[from]=-1; it.ov[to]=1; partRow=null; render();
+  if(!need())return;
+  var ok=await write("api_moveDay",[row,from,to]);
+  if(!ok){it.ov=old;render()}
 }
 async function setColor(type,idx){
   var old=colors[type]; colors[type]=idx; render();
@@ -913,8 +937,8 @@ async function readHistory(){
   return {weeks:w||{}};
 }
 function weekStats(rows){
-  var dp=[0,1,2,3,4,5,6].map(function(d){var tot=0,done=0;rows.forEach(function(i){var on=i.sched?!!i.sched[d]:d<6;if(on||i.days[d]){tot+=i.time;done+=i.time*dv(i.days[d])}});return tot?done/tot*100:0});
-  var vd=[0,1,2,3,4,5].concat(dp[6]>0||rows.some(function(i){return i.sched&&i.sched[6]})?[6]:[]);
+  var dp=[0,1,2,3,4,5,6].map(function(d){var tot=0,done=0;rows.forEach(function(i){var on=rowOn(i,d);if(on||i.days[d]){tot+=i.time;done+=i.time*dv(i.days[d])}});return tot?done/tot*100:0});
+  var vd=[0,1,2,3,4,5].concat(dp[6]>0||rows.some(function(i){return rowOn(i,6)})?[6]:[]);
   return {dp:dp,overall:vd.reduce(function(a,d){return a+dp[d]},0)/vd.length};
 }
 
@@ -925,7 +949,7 @@ function buildDayMap(){
   var weeks={}, map={};
   if(hist){Object.keys(hist.weeks).forEach(function(k){weeks[k]=hist.weeks[k]})}
   var cw=wkStart||currentWeekStart();
-  if(!weeks[cw]){weeks[cw]=items.filter(function(i){return !i.st||i.days.some(Boolean)}).map(function(i){return {type:i.type,cls:i.cls,time:i.time,days:i.days,sched:i.sched}})}
+  if(!weeks[cw]){weeks[cw]=items.filter(function(i){return !i.st||i.days.some(Boolean)}).map(function(i){return {type:i.type,cls:i.cls,time:i.time,days:i.days,sched:i.sched,ov:i.ov.slice(0,7)}})}
   Object.keys(weeks).forEach(function(ws){
     var rows=weeks[ws], m=ws.split("-"), st=weekStats(rows);
     for(var d=0;d<7;d++){
@@ -955,7 +979,7 @@ function renderCal(){
   if(calSel){
     var m=calSel.split("-"), full=new Date(+m[0],+m[1]-1,+m[2]).toLocaleDateString("ar-EG",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
     if(r){
-      var drows=r.rows.filter(function(x){return (x.sched?!!x.sched[r.d]:r.d<6)||x.days[r.d]});
+      var drows=r.rows.filter(function(x){return rowOn(x,r.d)||x.days[r.d]});
       var done=drows.filter(function(x){return dv(x.days[r.d])>=1}).length;
       html+='<div class="dh"><strong>'+full+'</strong><span class="pp">'+f1(r.pct)+'%</span></div><div class="s">أنجزت '+done+' من '+drows.length+' بالوقت</div><table class="htab"><tbody>';
       var last=null;
@@ -1123,6 +1147,7 @@ document.getElementById("outBtn").addEventListener("click",async function(){
 document.addEventListener("click",function(e){
   var pk=e.target.closest&&e.target.closest("[data-pick]"); if(pk){palType=null;setColor(decodeURIComponent(pk.dataset.type),+pk.dataset.pick);return}
   var pl=e.target.closest&&e.target.closest("[data-pal]"); if(pl){var pt=decodeURIComponent(pl.dataset.pal);palType=palType===pt?null:pt;render();return}
+  var mvb=e.target.closest&&e.target.closest("[data-mv]"); if(mvb){moveDay(+mvb.dataset.row,sel,sel+(+mvb.dataset.mv));return}
   var sb=e.target.closest&&e.target.closest("[data-st]"); if(sb){setSt(+sb.dataset.row,sb.dataset.st);return}
   var vb=e.target.closest&&e.target.closest("[data-view]"); if(vb){view=vb.dataset.view;partRow=null;render();window.scrollTo(0,0);return}
   var fc=e.target.closest&&e.target.closest("[data-frac]"); if(fc){partRow=null;setFrac(+fc.dataset.row,sel,+fc.dataset.frac);return}
@@ -1133,7 +1158,7 @@ document.addEventListener("click",function(e){
   var ed=e.target.closest&&e.target.closest("[data-edit]"); if(ed){editing=+ed.dataset.edit;render();return}
   var b=e.target.closest&&e.target.closest("[data-act]"); if(b){
     var it=find(+b.dataset.row); if(!it)return;
-    if(b.dataset.act==="part"||b.dataset.act==="more"){var m=b.dataset.act==="part"?"f":"m";partRow=(partRow===it.row&&partMode===m)?null:it.row;partMode=m;render()}
+    if(b.dataset.act==="part"||b.dataset.act==="more"||b.dataset.act==="later"){var m=b.dataset.act==="part"?"f":b.dataset.act==="more"?"m":"d";partRow=(partRow===it.row&&partMode===m)?null:it.row;partMode=m;render()}
     else if(b.dataset.act==="edit"){openForm(it)}
     else{delRow=it.row;document.getElementById("delMsg").textContent=it.type+" · "+it.cls;delDlg.showModal()}
   }
