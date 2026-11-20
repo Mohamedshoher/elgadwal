@@ -138,6 +138,17 @@ h1{font-family:var(--font-display);font-size:26px;line-height:1.2;margin:0}
 .fr .chip.on{font-weight:600}
 .fpart{color:var(--accent);font-weight:600}
 .item{border-inline-start:4px solid var(--tc,transparent)}
+.grip{width:26px;height:28px;border:0;background:none;color:var(--muted);cursor:grab;touch-action:none;padding:0;display:flex;align-items:center;justify-content:center;flex:none;border-radius:8px}
+.grip svg{width:18px;height:18px;stroke-width:3.4}
+.grip:hover{color:var(--accent);background:var(--accent-soft)}
+body.dragging{user-select:none;-webkit-user-select:none;cursor:grabbing}
+body.dragging *{cursor:grabbing!important}
+.drag-src{opacity:.35}
+.ghost{background:var(--surface);border:1px solid var(--accent);border-radius:12px;box-shadow:0 10px 26px rgba(0,0,0,.28);opacity:.96;margin:0!important}
+.item.drop-before{box-shadow:inset 0 3px 0 var(--accent)}
+.item.drop-after{box-shadow:inset 0 -3px 0 var(--accent)}
+.grp.drop-before{box-shadow:0 -3px 0 var(--accent)}
+.grp.drop-after{box-shadow:0 3px 0 var(--accent)}
 .item .tick[aria-pressed="true"]{background:var(--tc,var(--accent));border-color:var(--tc,var(--accent));color:#fff}
 .item .tick.part{border-color:var(--tc,var(--accent));background:conic-gradient(var(--tc,var(--accent)) calc(var(--f)*360deg),var(--bg) 0)}
 .gh strong{display:flex;align-items:center;gap:8px}
@@ -435,9 +446,10 @@ function typeColor(t){
 }
 var weekNote="";
 function dayDate(d){var base=wkStart||currentWeekStart(),m=base.split('-');return new Date(+m[0],+m[1]-1,+m[2]+d)}
+function GRIPB(i){return '<button type="button" class="grip" data-grip="goal" data-row="'+i.row+'" aria-label="تحريك الهدف" title="اسحب وأفلت لتحريك الهدف"><svg viewBox="0 0 24 24"><path d="M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01"/></svg></button>'}
 function groupHead(g,right){
   var c=typeColor(g), open=palType===g;
-  var head='<div class="gh"><strong><button type="button" class="cdot" style="background:'+PALETTE[c]+'" data-pal="'+encodeURIComponent(g)+'" aria-expanded="'+open+'" aria-label="اختيار لون تصنيف '+esc(g)+'" title="اختيار اللون"></button>'+esc(g)+'</strong><span>'+right+'</span></div>';
+  var head='<div class="gh"><strong><button type="button" class="grip" data-grip="type" data-type="'+encodeURIComponent(g)+'" aria-label="تحريك القسم" title="اسحب وأفلت لتحريك القسم"><svg viewBox="0 0 24 24"><path d="M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01"/></svg></button><button type="button" class="cdot" style="background:'+PALETTE[c]+'" data-pal="'+encodeURIComponent(g)+'" aria-expanded="'+open+'" aria-label="اختيار لون تصنيف '+esc(g)+'" title="اختيار اللون"></button>'+esc(g)+'</strong><span>'+right+'</span></div>';
   if(open)head+='<div class="pal" role="group" aria-label="ألوان التصنيف">'+PALETTE.map(function(col,k){
     return '<button type="button" class="sw'+(k===c?' on':'')+'" style="background:'+col+'" data-pick="'+k+'" data-type="'+encodeURIComponent(g)+'" aria-label="'+PALNAMES[k]+'" aria-pressed="'+(k===c)+'"></button>'}).join("")+'</div>';
   return head;
@@ -449,6 +461,7 @@ function fmtMins(m){
   return (h?a(h)+" س":"")+(h&&r?" و ":"")+(r?a(r)+" د":"");
 }
 function dayLabel(d){return DAYS[d%7]+" · "+dayDate(d).toLocaleDateString("ar-EG",{day:"numeric",month:"long"})}
+var drag=null;
 var partRow=null, partMode="f", view="main";
 var VIEWS={done:"المكتملة",later:"المؤجلة للأسبوع القادم",cancel:"الملغية"};
 function mk(r,row){
@@ -531,6 +544,7 @@ function renderAlert(){
   document.getElementById("alertBody").innerHTML=h;
 }
 function render(){
+  if(drag){drag.late=true;return}
   updateBell();
   var t=todayIdx(), vd=visDays();
   var nd=navDays(); if(nd.indexOf(sel)<0)sel=0;
@@ -572,7 +586,7 @@ function render(){
   todo.forEach(function(i){if(!by[i.type]){by[i.type]=[];order.push(i.type)}by[i.type].push(i)});
   var html=order.map(function(g){
     var list=by[g], mins=list.reduce(function(a,i){return a+i.time},0);
-    return groupHead(g,mins+' دقيقة')+'<div class="card">'+list.map(rowHtml).join("")+'</div>';
+    return '<div class="grp" data-type="'+encodeURIComponent(g)+'">'+groupHead(g,mins+' دقيقة')+'<div class="card">'+list.map(rowHtml).join("")+'</div></div>';
   }).join("");
   if(!dayItems.length)html='<div class="empty-note">'+(items.length?'لا توجد أهداف في هذا اليوم.':'لا توجد أهداف بعد. افتح القائمة وأضف هدفًا.')+'</div>';
   else if(!todo.length)html='<div class="empty-note">أحسنت، أنجزت كل أهداف هذا اليوم.</div>'+html;
@@ -599,10 +613,10 @@ function rowHtml(i){
   else if(partRow===i.row)fr='<div class="opanel"><h5>تأجيل الهدف أو إلغاؤه</h5><div class="opts">'+
       (wk||i.st==='p'?'':'<button type="button" class="opt warn" data-st="p" data-row="'+i.row+'">'+ICON_CLOCK+'<span><b>تأجيل للأسبوع القادم</b><small>يختفي الآن ويعود تلقائيًا عند بدء الأسبوع الجديد</small></span></button>')+
       '<button type="button" class="opt bad" data-st="c" data-row="'+i.row+'">'+ICON_X+'<span><b>إلغاء الهدف</b><small>ينتقل إلى «الملغية» ويمكن استرجاعه</small></span></button></div></div>';
-  return '<div class="item'+(on?' done':'')+(part?' partial':'')+'" style="--tc:'+PALETTE[typeColor(i.type)]+'">'+
+  return '<div class="item'+(on?' done':'')+(part?' partial':'')+'" data-row="'+i.row+'" data-type="'+encodeURIComponent(i.type)+'" style="--tc:'+PALETTE[typeColor(i.type)]+'">'+
     '<button type="button" class="tick'+(part?' part':'')+'"'+(part?' style="--f:'+fv+'"':'')+' data-row="'+i.row+'" aria-pressed="'+on+'" aria-label="تم في '+DAYS[sel%7]+'">'+ICON_CHECK+'</button>'+
     '<div class="body">'+
-      '<div class="l1"><span class="name">'+esc(i.cls)+'</span>'+
+      '<div class="l1">'+GRIPB(i)+'<span class="name">'+esc(i.cls)+'</span>'+
         '<button type="button" class="icon sm" data-act="part" data-row="'+i.row+'" aria-label="تعليم ربع أو نصف" title="تعليم ربع أو نصف" style="font-size:15px;font-weight:700">½</button>'+
         '<button type="button" class="icon sm" data-act="later" data-row="'+i.row+'" aria-label="تأجيل إلى الغد أو بعد غد" title="تأجيل إلى الغد أو بعد غد">'+ICON_NEXT+'</button>'+
         '<button type="button" class="icon sm" data-act="more" data-row="'+i.row+'" aria-label="تأجيل أو إلغاء الهدف" title="تأجيل أو إلغاء">'+ICON_X+'</button>'+
@@ -617,8 +631,8 @@ function vrowHtml(i){
   var p=pct(i,0), acts=i.st==='c'?'<button type="button" class="chip" data-st="" data-row="'+i.row+'">استرجاع</button>'
     :i.st==='p'?'<button type="button" class="chip" data-st="" data-row="'+i.row+'">تفعيل الآن</button><button type="button" class="chip bad" data-st="c" data-row="'+i.row+'">إلغاء الهدف</button>'
     :'<button type="button" class="chip warn" data-st="p" data-row="'+i.row+'">تأجيل</button><button type="button" class="chip bad" data-st="c" data-row="'+i.row+'">إلغاء الهدف</button>';
-  return '<div class="item vrow" style="--tc:'+PALETTE[typeColor(i.type)]+'"><div class="body">'+
-    '<div class="l1"><span class="name">'+esc(i.cls)+'</span>'+
+  return '<div class="item vrow" data-row="'+i.row+'" data-type="'+encodeURIComponent(i.type)+'" style="--tc:'+PALETTE[typeColor(i.type)]+'"><div class="body">'+
+    '<div class="l1">'+GRIPB(i)+'<span class="name">'+esc(i.cls)+'</span>'+
       '<button type="button" class="icon sm" data-act="edit" data-row="'+i.row+'" aria-label="تعديل الهدف">'+ICON_EDIT+'</button>'+
       '<button type="button" class="icon sm del" data-act="del" data-row="'+i.row+'" aria-label="حذف الهدف">'+ICON_DEL+'</button></div>'+
     '<div class="l2"><span>'+esc(i.type)+'</span>'+(i.qty?'<span>'+esc(i.qty)+'</span>':'')+'<span>'+i.time+' د</span><span class="pct">'+f1(p)+'%</span></div>'+
@@ -686,6 +700,11 @@ async function call(name){
       var ck=String(a[0]||"").slice(0,80), cv=Number(a[1]);
       if(!ck||!(cv>=0&&cv<PALETTE.length))throw new Error("لون غير صحيح.");
       d.colors=d.colors||{}; d.colors[ck]=cv; break;
+    case "api_reorder":
+      var ro=a[0];
+      if(!Array.isArray(ro)||ro.length!==it.length)throw new Error("ترتيب غير صحيح.");
+      var rs={}, rn=ro.map(function(r){var k=Number(r)-2;if(!(k>=0&&k<it.length)||rs[k])throw new Error("ترتيب غير صحيح.");rs[k]=1;return it[k]});
+      it.length=0; rn.forEach(function(x){it.push(x)}); break;
     case "api_setStatus": at(a[0])[14]=a[1]==="c"||a[1]==="p"?a[1]:0; break;
     case "api_setDay":
       var sd=Number(a[1]), sx=at(a[0]);
@@ -838,6 +857,57 @@ async function moveDay(row,from,to){
   var ok=await write("api_moveDay",[row,from,to]);
   if(!ok){it.ov=old;render()}
 }
+async function applyOrder(next){
+  var before=items.slice(), oldRows=before.map(function(i){return i.row}), rowsOrder=next.map(function(i){return i.row});
+  items=next; items.forEach(function(i,k){i.row=k+2}); partRow=null; editing=null; render();
+  if(!need())return;
+  var ok=await write("api_reorder",[rowsOrder]);
+  if(!ok){items=before; items.forEach(function(i,k){i.row=oldRows[k]}); render()}
+}
+function moveGoal(src,tgt,after){
+  var a=items.slice(), si=a.findIndex(function(i){return i.row===src}); if(si<0)return;
+  var s=a.splice(si,1)[0], ti=a.findIndex(function(i){return i.row===tgt}); if(ti<0)return;
+  a.splice(after?ti+1:ti,0,s); applyOrder(a);
+}
+function moveType(src,tgt,after){
+  var order=[]; items.forEach(function(i){if(order.indexOf(i.type)<0)order.push(i.type)});
+  var si=order.indexOf(src); if(si<0||order.indexOf(tgt)<0)return;
+  order.splice(si,1); var ti=order.indexOf(tgt); order.splice(after?ti+1:ti,0,src);
+  var next=[]; order.forEach(function(t){items.forEach(function(i){if(i.type===t)next.push(i)})}); applyOrder(next);
+}
+function dragClear(){document.querySelectorAll(".drop-before,.drop-after").forEach(function(x){x.classList.remove("drop-before","drop-after")})}
+function dragUpdate(){
+  var d=drag; d.ghost.style.top=(d.y-d.dy)+"px"; dragClear();
+  var el=document.elementFromPoint(d.x,d.y), t=null;
+  if(el)t=d.kind==="goal"?el.closest(".item[data-row]"):el.closest(".grp");
+  if(!t||t===d.srcEl||(d.kind==="goal"&&t.dataset.type!==d.srcEl.dataset.type))t=null;
+  d.tgt=t;
+  if(t){var r=t.getBoundingClientRect(); d.after=d.kind==="goal"?d.y>r.top+r.height/2:d.y>r.top+Math.min(r.height/2,70); t.classList.add(d.after?"drop-after":"drop-before")}
+}
+function dragEnd(commit){
+  var d=drag; if(!d)return; drag=null;
+  clearInterval(d.timer); dragClear(); d.ghost.remove(); d.srcEl.classList.remove("drag-src"); document.body.classList.remove("dragging");
+  if(commit&&d.tgt){
+    if(d.kind==="goal")moveGoal(d.src,+d.tgt.dataset.row,d.after);
+    else moveType(d.src,decodeURIComponent(d.tgt.dataset.type),d.after);
+  }else if(d.late)render();
+}
+document.addEventListener("pointerdown",function(e){
+  var g=e.target.closest&&e.target.closest(".grip"); if(!g||drag||(e.pointerType==="mouse"&&e.button!==0))return;
+  var kind=g.dataset.grip, srcEl=kind==="goal"?g.closest(".item"):g.closest(".grp"); if(!srcEl)return;
+  e.preventDefault();
+  var hdr=kind==="goal"?srcEl:srcEl.querySelector(".gh"), r=hdr.getBoundingClientRect(), ghost=hdr.cloneNode(true);
+  ghost.classList.add("ghost"); ghost.style.cssText="position:fixed;left:"+r.left+"px;top:"+r.top+"px;width:"+r.width+"px;pointer-events:none;z-index:60";
+  document.body.appendChild(ghost); srcEl.classList.add("drag-src"); document.body.classList.add("dragging");
+  drag={kind:kind,src:kind==="goal"?+g.dataset.row:decodeURIComponent(g.dataset.type),srcEl:srcEl,ghost:ghost,dy:e.clientY-r.top,x:e.clientX,y:e.clientY,tgt:null,after:false,pid:e.pointerId,late:false,
+    timer:setInterval(function(){if(!drag)return;if(drag.y<80)window.scrollBy(0,-14);else if(drag.y>innerHeight-130)window.scrollBy(0,14);dragUpdate()},30)};
+  try{g.setPointerCapture(e.pointerId)}catch(_){}
+  dragUpdate();
+});
+document.addEventListener("pointermove",function(e){if(!drag||e.pointerId!==drag.pid)return;e.preventDefault();drag.x=e.clientX;drag.y=e.clientY;dragUpdate()},{passive:false});
+document.addEventListener("pointerup",function(e){if(drag&&e.pointerId===drag.pid)dragEnd(true)});
+document.addEventListener("pointercancel",function(e){if(drag&&e.pointerId===drag.pid)dragEnd(false)});
+document.addEventListener("contextmenu",function(e){if(drag||(e.target.closest&&e.target.closest(".grip")))e.preventDefault()});
 async function setColor(type,idx){
   var old=colors[type]; colors[type]=idx; render();
   if(!need())return;
