@@ -137,6 +137,15 @@ h1{font-family:var(--font-display);font-size:26px;line-height:1.2;margin:0}
 .fr .chip:hover,.fr .chip.on{border-color:var(--accent);color:var(--accent)}
 .fr .chip.on{font-weight:600}
 .fpart{color:var(--accent);font-weight:600}
+.item{border-inline-start:4px solid var(--tc,transparent)}
+.item .tick[aria-pressed="true"]{background:var(--tc,var(--accent));border-color:var(--tc,var(--accent));color:#fff}
+.item .tick.part{border-color:var(--tc,var(--accent));background:conic-gradient(var(--tc,var(--accent)) calc(var(--f)*360deg),var(--bg) 0)}
+.gh strong{display:flex;align-items:center;gap:8px}
+.cdot{width:18px;height:18px;border-radius:50%;border:2px solid var(--surface);box-shadow:0 0 0 1px var(--line);padding:0;flex:none}
+.cdot:hover{box-shadow:0 0 0 2px var(--ink)}
+.pal{display:flex;flex-wrap:wrap;gap:10px;margin:0 4px 8px;padding:10px;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
+.sw{width:30px;height:30px;border-radius:50%;border:2px solid var(--surface);box-shadow:0 0 0 1px var(--line);padding:0}
+.sw.on{box-shadow:0 0 0 2px var(--ink)}
 .opanel{margin-top:8px;padding:10px;border:1px solid var(--line);border-radius:12px;background:var(--bg)}
 .opanel h5{margin:0 0 8px;font-size:12px;font-weight:600;color:var(--muted)}
 .opanel .fr{margin-top:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(84px,1fr))}
@@ -429,6 +438,22 @@ function dv(v){
 }
 function fracName(v){return v>=1?"تم":v===0.25?"ربع":v===0.5?"نصف":v===0.75?"ثلاثة أرباع":Math.round(v*100)+"٪"}
 var ICON_X='<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9 9l6 6M15 9l-6 6"/></svg>', ICON_CLOCK='<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>';
+var PALETTE=["#0f8f7a","#2f7fd1","#8a5cd6","#d6527f","#d9534f","#e0872a","#b8962b","#4a9d3f"];
+var PALNAMES=["أخضر مزرق","أزرق","بنفسجي","وردي","أحمر","برتقالي","ذهبي","أخضر"];
+var colors={}, palType=null;
+function typeColor(t){
+  var c=colors[t];
+  if(typeof c==="number"&&c>=0&&c<PALETTE.length)return c;
+  var h=5381; for(var k=0;k<t.length;k++)h=((h*33)^t.charCodeAt(k))>>>0;
+  return h%PALETTE.length;
+}
+function groupHead(g,right){
+  var c=typeColor(g), open=palType===g;
+  var head='<div class="gh"><strong><button type="button" class="cdot" style="background:'+PALETTE[c]+'" data-pal="'+encodeURIComponent(g)+'" aria-expanded="'+open+'" aria-label="اختيار لون تصنيف '+esc(g)+'" title="اختيار اللون"></button>'+esc(g)+'</strong><span>'+right+'</span></div>';
+  if(open)head+='<div class="pal" role="group" aria-label="ألوان التصنيف">'+PALETTE.map(function(col,k){
+    return '<button type="button" class="sw'+(k===c?' on':'')+'" style="background:'+col+'" data-pick="'+k+'" data-type="'+encodeURIComponent(g)+'" aria-label="'+PALNAMES[k]+'" aria-pressed="'+(k===c)+'"></button>'}).join("")+'</div>';
+  return head;
+}
 var partRow=null, partMode="f", view="main";
 var VIEWS={done:"المكتملة",later:"المؤجلة للأسبوع القادم",cancel:"الملغية"};
 function mk(r,row){
@@ -538,7 +563,7 @@ function render(){
   todo.forEach(function(i){if(!by[i.type]){by[i.type]=[];order.push(i.type)}by[i.type].push(i)});
   var html=order.map(function(g){
     var list=by[g], mins=list.reduce(function(a,i){return a+i.time},0);
-    return '<div class="gh"><strong>'+esc(g)+'</strong><span>'+mins+' دقيقة</span></div><div class="card">'+list.map(rowHtml).join("")+'</div>';
+    return groupHead(g,mins+' دقيقة')+'<div class="card">'+list.map(rowHtml).join("")+'</div>';
   }).join("");
   if(!dayItems.length)html='<div class="empty-note">'+(items.length?'لا توجد أهداف في هذا اليوم.':'لا توجد أهداف بعد. افتح القائمة وأضف هدفًا.')+'</div>';
   else if(!todo.length)html='<div class="empty-note">أحسنت، أنجزت كل أهداف هذا اليوم.</div>'+html;
@@ -560,7 +585,7 @@ function rowHtml(i){
   else if(partRow===i.row)fr='<div class="opanel"><h5>تأجيل الهدف أو إلغاؤه</h5><div class="opts">'+
       '<button type="button" class="opt warn" data-st="p" data-row="'+i.row+'">'+ICON_CLOCK+'<span><b>تأجيل للأسبوع القادم</b><small>يختفي الآن ويعود تلقائيًا عند بدء الأسبوع الجديد</small></span></button>'+
       '<button type="button" class="opt bad" data-st="c" data-row="'+i.row+'">'+ICON_X+'<span><b>إلغاء الهدف</b><small>ينتقل إلى «الملغية» ويمكن استرجاعه</small></span></button></div></div>';
-  return '<div class="item'+(on?' done':'')+(part?' partial':'')+'">'+
+  return '<div class="item'+(on?' done':'')+(part?' partial':'')+'" style="--tc:'+PALETTE[typeColor(i.type)]+'">'+
     '<button type="button" class="tick'+(part?' part':'')+'"'+(part?' style="--f:'+fv+'"':'')+' data-row="'+i.row+'" aria-pressed="'+on+'" aria-label="تم في '+DAYS[sel]+'">'+ICON_CHECK+'</button>'+
     '<div class="body">'+
       '<div class="l1"><span class="name">'+esc(i.cls)+'</span>'+
@@ -577,7 +602,7 @@ function vrowHtml(i){
   var p=pct(i), acts=i.st==='c'?'<button type="button" class="chip" data-st="" data-row="'+i.row+'">استرجاع</button>'
     :i.st==='p'?'<button type="button" class="chip" data-st="" data-row="'+i.row+'">تفعيل الآن</button><button type="button" class="chip bad" data-st="c" data-row="'+i.row+'">إلغاء الهدف</button>'
     :'<button type="button" class="chip warn" data-st="p" data-row="'+i.row+'">تأجيل</button><button type="button" class="chip bad" data-st="c" data-row="'+i.row+'">إلغاء الهدف</button>';
-  return '<div class="item vrow"><div class="body">'+
+  return '<div class="item vrow" style="--tc:'+PALETTE[typeColor(i.type)]+'"><div class="body">'+
     '<div class="l1"><span class="name">'+esc(i.cls)+'</span>'+
       '<button type="button" class="icon sm" data-act="edit" data-row="'+i.row+'" aria-label="تعديل الهدف">'+ICON_EDIT+'</button>'+
       '<button type="button" class="icon sm del" data-act="del" data-row="'+i.row+'" aria-label="حذف الهدف">'+ICON_DEL+'</button></div>'+
@@ -610,8 +635,8 @@ function sync(){
 var user=null;
 function dkey(){return "wk:data:"+user}
 function readData(){
-  try{var d=JSON.parse(localStorage.getItem(dkey())||"null");if(d&&Array.isArray(d.items))return {items:d.items,hist:Array.isArray(d.hist)?d.hist:[]}}catch(_){}
-  return {items:[],hist:[]};
+  try{var d=JSON.parse(localStorage.getItem(dkey())||"null");if(d&&Array.isArray(d.items))return {items:d.items,hist:Array.isArray(d.hist)?d.hist:[],colors:d.colors&&typeof d.colors==='object'&&!Array.isArray(d.colors)?d.colors:{}}}catch(_){}
+  return {items:[],hist:[],colors:{}};
 }
 function saveData(d){
   try{localStorage.setItem(dkey(),JSON.stringify(d))}
@@ -629,7 +654,11 @@ async function call(name){
   }
   switch(name){
     case "api_init":
-      return {email:user,url:null,rows:it.map(function(v,i){return {row:i+2,v:v}})};
+      return {email:user,url:null,colors:d.colors,rows:it.map(function(v,i){return {row:i+2,v:v}})};
+    case "api_setColor":
+      var ck=String(a[0]||"").slice(0,80), cv=Number(a[1]);
+      if(!ck||!(cv>=0&&cv<PALETTE.length))throw new Error("لون غير صحيح.");
+      d.colors=d.colors||{}; d.colors[ck]=cv; break;
     case "api_setStatus": at(a[0])[14]=a[1]==="c"||a[1]==="p"?a[1]:0; break;
     case "api_setDay": at(a[0])[6+Number(a[1])]=dv(a[2]); break;
     case "api_setQty": at(a[0])[4]=String(a[1]||""); break;
@@ -673,7 +702,7 @@ async function sbRpc(fn,args){
   return j;
 }
 function cEmpty(d){return !(d&&((d.items&&d.items.length)||(d.hist&&d.hist.length)))}
-function cNorm(d){return {items:Array.isArray(d&&d.items)?d.items:[],hist:Array.isArray(d&&d.hist)?d.hist:[]}}
+function cNorm(d){return {items:Array.isArray(d&&d.items)?d.items:[],hist:Array.isArray(d&&d.hist)?d.hist:[],colors:d&&d.colors&&typeof d.colors==='object'&&!Array.isArray(d.colors)?d.colors:{}}}
 function cSchedule(){
   if(!cTok()||!user)return;
   cDirtySet(true); cMode=2;
@@ -731,7 +760,7 @@ async function load(){
   setStatus("busy","جارٍ التحديث…");
   try{
     var d=await call("api_init");
-    items=(d.rows||[]).map(function(r){return mk(r.v,r.row)});
+    items=(d.rows||[]).map(function(r){return mk(r.v,r.row)}); colors=d.colors||{};
     setAccount(d); banner(""); render(); sync();
   }catch(e){setStatus("err","تعذّر التحديث");banner(explain(e));render()}
 }
@@ -758,6 +787,12 @@ async function setFrac(row,d,nv){
 function toggle(row,d){
   var it=find(row); if(!it)return;
   return setFrac(row,d,dv(it.days[d])>=1?0:1);
+}
+async function setColor(type,idx){
+  var old=colors[type]; colors[type]=idx; render();
+  if(!need())return;
+  var ok=await write("api_setColor",[type,idx]);
+  if(!ok){if(old===undefined)delete colors[type];else colors[type]=old;render()}
 }
 async function setSt(row,st){
   var it=find(row); if(!it)return;
@@ -1090,6 +1125,8 @@ document.getElementById("outBtn").addEventListener("click",async function(){
 });
 /* أحداث القائمة الرئيسية */
 document.addEventListener("click",function(e){
+  var pk=e.target.closest&&e.target.closest("[data-pick]"); if(pk){palType=null;setColor(decodeURIComponent(pk.dataset.type),+pk.dataset.pick);return}
+  var pl=e.target.closest&&e.target.closest("[data-pal]"); if(pl){var pt=decodeURIComponent(pl.dataset.pal);palType=palType===pt?null:pt;render();return}
   var sb=e.target.closest&&e.target.closest("[data-st]"); if(sb){setSt(+sb.dataset.row,sb.dataset.st);return}
   var vb=e.target.closest&&e.target.closest("[data-view]"); if(vb){view=vb.dataset.view;partRow=null;render();window.scrollTo(0,0);return}
   var fc=e.target.closest&&e.target.closest("[data-frac]"); if(fc){partRow=null;setFrac(+fc.dataset.row,sel,+fc.dataset.frac);return}
