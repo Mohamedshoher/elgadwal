@@ -468,7 +468,8 @@ function mk(r,row){
   return {row:row,type:String(r[0]||"").trim(),cls:String(r[1]||"").trim(),time:num(r[2]),weekly:num(r[3]),
     qty:String(r[4]==null?"":r[4]),daily:num(r[5]),days:[0,1,2,3,4,5,6].map(function(k){return dv(r[6+k])}),
     sched:normSched(r[13]),st:r[14]==='c'||r[14]==='p'?r[14]:'',
-    nd:[0,1,2,3,4,5,6].map(function(k){return dv(Array.isArray(r[15])?r[15][k]:0)}),ov:normOv(r[16],14)};
+    nd:[0,1,2,3,4,5,6].map(function(k){return dv(Array.isArray(r[15])?r[15][k]:0)}),ov:normOv(r[16],14),
+    nx:(r[17]&&typeof r[17]==='object')?{type:String(r[17].type||'').trim(),cls:String(r[17].cls||'').trim(),time:num(r[17].time),weekly:num(r[17].weekly),qty:String(r[17].qty==null?'':r[17].qty),daily:num(r[17].daily),sched:normSched(r[17].sched)}:null};
 }
 /* sched: null = تلقائي (السبت إلى الخميس)، أو مصفوفة من 7 قيم صح/خطأ */
 function normSched(v){
@@ -479,13 +480,14 @@ function normSched(v){
 function baseOn(sc,d){return sc?!!sc[d]:d<6}
 function normOv(v,n){var a=[];for(var k=0;k<n;k++){var x=Array.isArray(v)?Number(v[k]):0;a.push(x===1?1:x===-1?-1:0)}return a}
 function rowOn(i,d){var o=i.ov&&i.ov[d];return o===-1?false:o===1?true:baseOn(i.sched,d%7)}
+function eff(i,wk){return wk&&i.nx?Object.assign({},i,i.nx):i}
 function dayv(i,d){return dv(d<7?i.days[d]:i.nd[d-7])}
 function setDv(i,d,v){if(d<7)i.days[d]=v;else i.nd[d-7]=v}
 function active(it,d){return !it.st&&rowOn(it,d)}
 function hasFri(){return items.some(function(i){return active(i,6)})}
 function visDays(){return hasFri()||sel===6||todayIdx()===6?[0,1,2,3,4,5,6]:[0,1,2,3,4,5]}
 function planned(i,d){return i.st!=='c'&&rowOn(i,d)}
-function nextDays(){return sel===13||items.some(function(i){return planned(i,13)})?[0,1,2,3,4,5,6]:[0,1,2,3,4,5]}
+function nextDays(){return sel===13||items.some(function(i){return planned(eff(i,1),13)})?[0,1,2,3,4,5,6]:[0,1,2,3,4,5]}
 function navDays(){return visDays().concat(nextDays().map(function(d){return d+7}))}
 function schedText(it){
   if(!it.sched)return "";
@@ -557,8 +559,8 @@ function render(){
   }).join("");
 
   var vi=nd.indexOf(sel), nx=sel>=7, dd=sel%7;
-  function dayMins(d){var m=0;items.forEach(function(i){if(d<7?active(i,d):planned(i,d))m+=i.time});return m}
-  function dayPct(d){var tot=0,done=0;items.forEach(function(i){if(d<7?active(i,d):planned(i,d)){tot+=i.time;done+=i.time*dayv(i,d)}});return tot?done/tot*100:0}
+  function dayMins(d){var m=0;items.forEach(function(i0){var i=eff(i0,d>=7?1:0);if(d<7?active(i,d):planned(i,d))m+=i.time});return m}
+  function dayPct(d){var tot=0,done=0;items.forEach(function(i0){var i=eff(i0,d>=7?1:0);if(d<7?active(i,d):planned(i,d)){tot+=i.time;done+=i.time*dayv(i,d)}});return tot?done/tot*100:0}
   document.getElementById("tabs").innerHTML=
     '<button type="button" class="tarr" data-dnav="-1" aria-label="اليوم السابق"'+(vi<=0?' disabled':'')+'><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>'+
     '<button type="button" class="tab'+(sel===t?' today':'')+'" role="tab" aria-selected="true" data-dnav="today" title="العودة إلى اليوم"><span class="n">'+DAYS[dd]+' / '+fmtMins(dayMins(sel))+'</span></button>'+
@@ -576,7 +578,7 @@ function render(){
     document.getElementById("groups").innerHTML='<div class="vnote">'+note+'</div>'+(vl.length?'<div class="gh"><strong>'+VIEWS[view]+'</strong><span>'+vl.length+'</span></div><div class="card">'+vl.map(vrowHtml).join("")+'</div>':'<div class="empty-note">لا توجد أهداف هنا.</div>');
     return;
   }
-  var live=wk?items.filter(function(i){return i.st!=='c'}):live0, isDone=function(i){return pct(i,wk)>=100-1e-9};
+  var live=wk?items.filter(function(i){return i.st!=='c'}).map(function(i){return eff(i,1)}):live0, isDone=function(i){return pct(i,wk)>=100-1e-9};
   var dayItems=live.filter(function(i){return wk?planned(i,sel):active(i,sel)});
   var doneN=dayItems.filter(function(i){return dayv(i,sel)>=1}).length;
   document.getElementById("sub").textContent=dayDate(sel).toLocaleDateString("ar-EG",{day:"numeric",month:"long",year:"numeric"})+" · أنجزت "+doneN+" من "+dayItems.length;
@@ -684,8 +686,12 @@ async function call(name){
       for(var q=0;q<14;q++)no.push(q<7?ov[q+7]:0);
       if(v[14]===undefined)v[14]=0; if(v[14]==="p")v[14]=0;
       v[15]=[0,0,0,0,0,0,0]; v[16]=no;
+      var nxo=v[17];
+      if(nxo&&typeof nxo==="object"){v[0]=nxo.type;v[1]=nxo.cls;v[2]=nxo.time;v[3]=nxo.weekly;v[4]=nxo.qty;v[5]=nxo.daily;v[13]=nxo.sched||null}
+      if(v.length>17)v[17]=null;
     });
   }
+  function padNx(x){while(x.length<14)x.push(x.length===13?null:false); if(x[13]===undefined)x[13]=null; if(x[14]===undefined)x[14]=0; if(x[15]===undefined)x[15]=[0,0,0,0,0,0,0]; if(x[16]===undefined)x[16]=normOv(null,14)}
   function at(row){var x=it[Number(row)-2];if(!x)throw new Error("الهدف غير موجود.");return x}
   function fill(x,g){
     var type=String(g.type||"").trim(), cls=String(g.cls||"").trim(), time=Number(g.time), weekly=Number(g.weekly), daily=Number(g.daily);
@@ -718,11 +724,21 @@ async function call(name){
       var mo=normOv(mx[16],14); mo[mf]=-1; mo[mt]=1;
       if(mx[14]===undefined)mx[14]=0; if(mx[15]===undefined)mx[15]=[0,0,0,0,0,0,0];
       mx[16]=mo; break;
-    case "api_setQty": at(a[0])[4]=String(a[1]||""); break;
+    case "api_setQty":
+      if(Number(a[2])===1){
+        var qx=at(a[0]), qn=(qx[17]&&typeof qx[17]==="object")?qx[17]:{type:qx[0],cls:qx[1],time:qx[2],weekly:qx[3],qty:qx[4],daily:qx[5],sched:qx[13]||null};
+        qn.qty=String(a[1]||""); padNx(qx); qx[17]=qn;
+      }else at(a[0])[4]=String(a[1]||"");
+      break;
     case "api_addGoal":
       if(it.length>=40)throw new Error("وصلت للحد الأقصى: 40 هدفًا.");
       r=["","",0,0,"",0,false,false,false,false,false,false,false,null]; fill(r,a[0]); it.push(r); break;
-    case "api_editGoal": fill(at(a[0]),a[1]); break;
+    case "api_editGoal":
+      if(Number(a[2])===1){
+        var ex=at(a[0]), et=ex.slice(); fill(et,a[1]);
+        padNx(ex); ex[17]={type:et[0],cls:et[1],time:et[2],weekly:et[3],qty:et[4],daily:et[5],sched:et[13]||null};
+      }else fill(at(a[0]),a[1]);
+      break;
     case "api_deleteGoal": at(a[0]); it.splice(Number(a[0])-2,1); break;
       break;
     case "api_rollover":
@@ -923,6 +939,15 @@ async function setSt(row,st){
 }
 async function saveQty(row,val){
   var it=find(row); editing=null; if(!it){render();return}
+  if(sel>=7&&view==="main"){
+    var cur=eff(it,1);
+    if(val===cur.qty){render();return}
+    var oldN=it.nx; it.nx=Object.assign({type:it.type,cls:it.cls,time:it.time,weekly:it.weekly,qty:it.qty,daily:it.daily,sched:it.sched},it.nx||{},{qty:val}); render();
+    if(!need())return;
+    var okq=await write("api_setQty",[row,val,1]);
+    if(!okq){it.nx=oldN;render()}
+    return;
+  }
   if(val===it.qty){render();return}
   var old=it.qty; it.qty=val; render();
   if(!need())return;
@@ -940,8 +965,15 @@ async function addGoal(g){
   if(!ok){items=items.filter(function(i){return i!==it});render();return false}
   return true;
 }
-async function editGoal(row,g){
+async function editGoal(row,g,wk){
   var it=find(row); if(!it)return;
+  if(wk===1){
+    var oldNx=it.nx; it.nx={type:g.type,cls:g.cls,time:g.time,weekly:g.weekly,qty:g.qty,daily:g.daily,sched:normSched(g.sched)}; render();
+    if(!need())return;
+    var ok1=await write("api_editGoal",[row,g,1]);
+    if(!ok1){it.nx=oldNx;render()}
+    return;
+  }
   var old={type:it.type,cls:it.cls,time:it.time,weekly:it.weekly,qty:it.qty,daily:it.daily,sched:it.sched};
   it.type=g.type;it.cls=g.cls;it.time=g.time;it.weekly=g.weekly;it.qty=g.qty;it.daily=g.daily;it.sched=normSched(g.sched); render();
   if(!need())return;
@@ -970,10 +1002,11 @@ document.getElementById("fDays").addEventListener("click",function(e){
   var d=+b.dataset.d; fSched[d]=!fSched[d]; paintDays();
 });
 Array.prototype.forEach.call(document.querySelectorAll('input[name=fMode]'),function(r){r.addEventListener("change",paintDays)});
-function openForm(it){
-  editRow=it?it.row:null;
+var editWk=0;
+function openForm(it,wk){
+  editRow=it?it.row:null; editWk=it&&wk?1:0;
   document.getElementById("addForm").reset();
-  document.getElementById("addTitle").textContent=it?"تعديل الهدف":"إضافة هدف جديد";
+  document.getElementById("addTitle").textContent=it?(editWk?"تعديل الهدف (للأسبوع القادم فقط)":"تعديل الهدف"):"إضافة هدف جديد";
   document.getElementById("addYes").textContent=it?"حفظ":"إضافة";
   document.getElementById("fTime").value=it?it.time:"30";
   if(it){
@@ -1000,7 +1033,7 @@ document.getElementById("addYes").addEventListener("click",async function(){
   if(!(g.time>0)||!(g.weekly>0)||!(g.daily>0)){err.textContent="الوقت والهدفان لازم يكونوا أكبر من صفر.";return}
   if(items.some(function(i){return i.row!==editRow&&i.type===g.type&&i.cls===g.cls})){err.textContent="هذا البند موجود في الجدول.";return}
   addDlg.close();
-  if(editRow!==null)await editGoal(editRow,g); else await addGoal(g);
+  if(editRow!==null)await editGoal(editRow,g,editWk); else await addGoal(g);
 });
 document.getElementById("delNo").addEventListener("click",function(){delDlg.close()});
 document.getElementById("delYes").addEventListener("click",function(){delDlg.close();if(delRow!==null)deleteGoal(delRow)});
@@ -1236,7 +1269,7 @@ document.addEventListener("click",function(e){
   var b=e.target.closest&&e.target.closest("[data-act]"); if(b){
     var it=find(+b.dataset.row); if(!it)return;
     if(b.dataset.act==="part"||b.dataset.act==="more"||b.dataset.act==="later"){var m=b.dataset.act==="part"?"f":b.dataset.act==="more"?"m":"d";partRow=(partRow===it.row&&partMode===m)?null:it.row;partMode=m;render()}
-    else if(b.dataset.act==="edit"){openForm(it)}
+    else if(b.dataset.act==="edit"){var ew=sel>=7&&view==="main"?1:0;openForm(ew?eff(it,1):it,ew)}
     else{delRow=it.row;document.getElementById("delMsg").textContent=it.type+" · "+it.cls;delDlg.showModal()}
   }
 });
