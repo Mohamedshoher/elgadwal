@@ -458,6 +458,9 @@ function normSched(v){
 function active(it,d){return !it.st&&(it.sched?!!it.sched[d]:d<6)}
 function hasFri(){return items.some(function(i){return active(i,6)})}
 function visDays(){return hasFri()?[0,1,2,3,4,5,6]:[0,1,2,3,4,5]}
+function planned(i,d){return i.st!=='c'&&(i.sched?!!i.sched[d]:d<6)}
+function nextDays(){return items.some(function(i){return planned(i,6)})?[0,1,2,3,4,5,6]:[0,1,2,3,4,5]}
+function navDays(){return visDays().concat(nextDays().map(function(d){return d+7}))}
 function schedText(it){
   if(!it.sched)return "";
   var n=it.sched.filter(Boolean).length;
@@ -516,7 +519,7 @@ function renderAlert(){
 function render(){
   updateBell();
   var t=todayIdx(), vd=visDays();
-  if(vd.indexOf(sel)<0)sel=0;
+  var nd=navDays(); if(nd.indexOf(sel)<0)sel=0;
   var dp=DAYS.map(function(_,d){var tot=0,done=0;items.forEach(function(i){if(active(i,d)){tot+=i.time;done+=i.time*dv(i.days[d])}});return tot?done/tot*100:0});
   var overall=vd.reduce(function(a,d){return a+dp[d]},0)/vd.length;
 
@@ -525,11 +528,11 @@ function render(){
     return '<div class="wrow"><span>'+n+'</span><div class="track"><i style="width:'+Math.min(100,dp[d])+'%;background:var(--accent)"></i></div><b>'+f1(dp[d])+'%</b></div>';
   }).join("");
 
-  var vi=vd.indexOf(sel);
+  var vi=nd.indexOf(sel), nx=sel>=7, dd=sel%7;
   document.getElementById("tabs").innerHTML=
     '<button type="button" class="tarr" data-dnav="-1" aria-label="اليوم السابق"'+(vi<=0?' disabled':'')+'><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>'+
-    '<button type="button" class="tab'+(sel===t?' today':'')+'" role="tab" aria-selected="true" data-dnav="today" title="العودة إلى اليوم"><span class="n">'+(sel===t?"اليوم · ":"")+DAYS[sel]+'</span><span class="p">'+dayDate(sel).toLocaleDateString("ar-EG",{day:"numeric",month:"long"})+' · '+f1(dp[sel])+'%</span></button>'+
-    '<button type="button" class="tarr" data-dnav="1" aria-label="اليوم التالي"'+(vi>=vd.length-1?' disabled':'')+'><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button>';
+    '<button type="button" class="tab'+(sel===t?' today':'')+'" role="tab" aria-selected="true" data-dnav="today" title="العودة إلى اليوم"><span class="n">'+(nx?"الأسبوع القادم · ":(sel===t?"اليوم · ":""))+DAYS[dd]+'</span><span class="p">'+dayDate(sel).toLocaleDateString("ar-EG",{day:"numeric",month:"long"})+' · '+(nx?'خطة':f1(dp[sel])+'%')+'</span></button>'+
+    '<button type="button" class="tarr" data-dnav="1" aria-label="اليوم التالي"'+(vi>=nd.length-1?' disabled':'')+'><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button>';
   var live=items.filter(function(i){return !i.st}), isDone=function(i){return pct(i)>=100-1e-9};
   var cDone=live.filter(isDone).length, cLater=items.filter(function(i){return i.st==='p'}).length, cCancel=items.filter(function(i){return i.st==='c'}).length;
   [["nDone",cDone],["nLater",cLater],["nCancel",cCancel]].forEach(function(x){var e=document.getElementById(x[0]);e.textContent=x[1];e.hidden=!x[1]});
@@ -540,6 +543,16 @@ function render(){
     var note=view==="done"?"أهداف بلغت 100٪ من هدفها الأسبوعي.":view==="later"?"تعود هذه الأهداف إلى قائمتك تلقائيًا عند بدء الأسبوع الجديد، ولا تدخل في نسبة هذا الأسبوع.":"أهداف ملغاة: لا تدخل في النسب ولا تظهر في القائمة، ويمكنك استرجاعها.";
     document.getElementById("sub").textContent=VIEWS[view]+" · "+vl.length;
     document.getElementById("groups").innerHTML='<div class="vnote">'+note+'</div>'+(vl.length?'<div class="gh"><strong>'+VIEWS[view]+'</strong><span>'+vl.length+'</span></div><div class="card">'+vl.map(vrowHtml).join("")+'</div>':'<div class="empty-note">لا توجد أهداف هنا.</div>');
+    return;
+  }
+  if(sel>=7){
+    var pv=items.filter(function(i){return planned(i,dd)}), po={}, pg=[];
+    pv.forEach(function(i){if(!po[i.type]){po[i.type]=[];pg.push(i.type)}po[i.type].push(i)});
+    document.getElementById("sub").textContent="الأسبوع القادم · "+DAYS[dd]+" · "+pv.length+(pv.length>10?" هدفًا":pv.length===1?" هدف":" أهداف");
+    document.getElementById("groups").innerHTML='<div class="vnote">معاينة وتخطيط: هذه أهداف الأسبوع القادم بحسب أيام كل هدف، وتشمل المؤجَّلة من هذا الأسبوع. يبدأ التعليم عند دخول الأسبوع.</div>'+(pv.length?pg.map(function(g){
+      var l=po[g], m=l.reduce(function(a,i){return a+i.time},0);
+      return groupHead(g,m+' دقيقة')+'<div class="card">'+l.map(prevHtml).join("")+'</div>';
+    }).join(""):'<div class="empty-note">لا توجد أهداف في هذا اليوم من الأسبوع القادم.</div>');
     return;
   }
   var dayItems=live.filter(function(i){return active(i,sel)});
@@ -586,6 +599,13 @@ function rowHtml(i){
     '</div></div>';
 }
 
+function prevHtml(i){
+  return '<div class="item vrow" style="--tc:'+PALETTE[typeColor(i.type)]+'"><div class="body">'+
+    '<div class="l1"><span class="name">'+esc(i.cls)+'</span>'+
+      '<button type="button" class="icon sm" data-act="edit" data-row="'+i.row+'" aria-label="تعديل الهدف">'+ICON_EDIT+'</button></div>'+
+    '<div class="l2">'+(i.qty?'<span>'+esc(i.qty)+'</span>':'')+'<span>'+i.time+' د</span>'+(i.st==='p'?'<span class="fpart">مؤجل من هذا الأسبوع</span>':'')+(i.sched?'<span class="sdays">'+esc(schedText(i))+'</span>':'')+'</div>'+
+    '</div></div>';
+}
 function vrowHtml(i){
   var p=pct(i), acts=i.st==='c'?'<button type="button" class="chip" data-st="" data-row="'+i.row+'">استرجاع</button>'
     :i.st==='p'?'<button type="button" class="chip" data-st="" data-row="'+i.row+'">تفعيل الآن</button><button type="button" class="chip bad" data-st="c" data-row="'+i.row+'">إلغاء الهدف</button>'
@@ -1108,7 +1128,7 @@ document.addEventListener("click",function(e){
   var fc=e.target.closest&&e.target.closest("[data-frac]"); if(fc){partRow=null;setFrac(+fc.dataset.row,sel,+fc.dataset.frac);return}
   var tk=e.target.closest&&e.target.closest(".tick"); if(tk){partRow=null;toggle(+tk.dataset.row,sel);return}
   var dn=e.target.closest&&e.target.closest("[data-dnav]"); if(dn){
-    var vd2=visDays(), k=dn.dataset.dnav, ni=k==="today"?vd2.indexOf(todayIdx()):vd2.indexOf(sel)+(+k);
+    var vd2=navDays(), k=dn.dataset.dnav, ni=k==="today"?vd2.indexOf(todayIdx()):vd2.indexOf(sel)+(+k);
     if(ni<0||ni>=vd2.length)ni=0; if(ni>=0&&vd2[ni]!==undefined){sel=vd2[ni];partRow=null;editing=null;render()}return}
   var ed=e.target.closest&&e.target.closest("[data-edit]"); if(ed){editing=+ed.dataset.edit;render();return}
   var b=e.target.closest&&e.target.closest("[data-act]"); if(b){
