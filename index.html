@@ -440,13 +440,15 @@ function fracName(v){return v>=1?"تم":v===0.25?"ربع":v===0.5?"نصف":v===0
 var ICON_X='<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9 9l6 6M15 9l-6 6"/></svg>', ICON_CLOCK='<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>';
 var PALETTE=["#0f8f7a","#2f7fd1","#8a5cd6","#d6527f","#d9534f","#e0872a","#b8962b","#4a9d3f"];
 var PALNAMES=["أخضر مزرق","أزرق","بنفسجي","وردي","أحمر","برتقالي","ذهبي","أخضر"];
-var colors={}, palType=null;
+var colors={}, palType=null, wkStart="";
 function typeColor(t){
   var c=colors[t];
   if(typeof c==="number"&&c>=0&&c<PALETTE.length)return c;
   var h=5381; for(var k=0;k<t.length;k++)h=((h*33)^t.charCodeAt(k))>>>0;
   return h%PALETTE.length;
 }
+var weekNote="";
+function dayDate(d){var base=wkStart||currentWeekStart(),m=base.split('-');return new Date(+m[0],+m[1]-1,+m[2]+d)}
 function groupHead(g,right){
   var c=typeColor(g), open=palType===g;
   var head='<div class="gh"><strong><button type="button" class="cdot" style="background:'+PALETTE[c]+'" data-pal="'+encodeURIComponent(g)+'" aria-expanded="'+open+'" aria-label="اختيار لون تصنيف '+esc(g)+'" title="اختيار اللون"></button>'+esc(g)+'</strong><span>'+right+'</span></div>';
@@ -540,7 +542,7 @@ function render(){
   var vi=vd.indexOf(sel);
   document.getElementById("tabs").innerHTML=
     '<button type="button" class="tarr" data-dnav="-1" aria-label="اليوم السابق"'+(vi<=0?' disabled':'')+'><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>'+
-    '<button type="button" class="tab'+(sel===t?' today':'')+'" role="tab" aria-selected="true" data-dnav="today" title="العودة إلى اليوم"><span class="n">'+(sel===t?"اليوم · ":"")+DAYS[sel]+'</span><span class="p">'+f1(dp[sel])+'%</span></button>'+
+    '<button type="button" class="tab'+(sel===t?' today':'')+'" role="tab" aria-selected="true" data-dnav="today" title="العودة إلى اليوم"><span class="n">'+(sel===t?"اليوم · ":"")+DAYS[sel]+'</span><span class="p">'+dayDate(sel).toLocaleDateString("ar-EG",{day:"numeric",month:"long"})+' · '+f1(dp[sel])+'%</span></button>'+
     '<button type="button" class="tarr" data-dnav="1" aria-label="اليوم التالي"'+(vi>=vd.length-1?' disabled':'')+'><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button>';
   var live=items.filter(function(i){return !i.st}), isDone=function(i){return pct(i)>=100-1e-9};
   var cDone=live.filter(isDone).length, cLater=items.filter(function(i){return i.st==='p'}).length, cCancel=items.filter(function(i){return i.st==='c'}).length;
@@ -635,8 +637,8 @@ function sync(){
 var user=null;
 function dkey(){return "wk:data:"+user}
 function readData(){
-  try{var d=JSON.parse(localStorage.getItem(dkey())||"null");if(d&&Array.isArray(d.items))return {items:d.items,hist:Array.isArray(d.hist)?d.hist:[],colors:d.colors&&typeof d.colors==='object'&&!Array.isArray(d.colors)?d.colors:{}}}catch(_){}
-  return {items:[],hist:[],colors:{}};
+  try{var d=JSON.parse(localStorage.getItem(dkey())||"null");if(d&&Array.isArray(d.items))return {items:d.items,hist:Array.isArray(d.hist)?d.hist:[],colors:d.colors&&typeof d.colors==='object'&&!Array.isArray(d.colors)?d.colors:{},weekStart:/^\d{4}-\d{2}-\d{2}$/.test(d.weekStart||'')?d.weekStart:''}}catch(_){}
+  return {items:[],hist:[],colors:{},weekStart:''};
 }
 function saveData(d){
   try{localStorage.setItem(dkey(),JSON.stringify(d))}
@@ -645,6 +647,12 @@ function saveData(d){
 }
 async function call(name){
   var a=Array.prototype.slice.call(arguments,1), d=readData(), it=d.items, r;
+  var res=null;
+  function archiveWeek(date){
+    if(it.some(function(v){return v.slice(6,13).some(Boolean)}))
+      it.forEach(function(v){if(v[14]&&!v.slice(6,13).some(Boolean))return;d.hist.push({date:date,type:v[0],cls:v[1],time:v[2],weekly:v[3],daily:v[5],qty:v[4],days:v.slice(6,13),sched:v[13]||null})});
+    it.forEach(function(v){for(var k=6;k<13;k++)v[k]=false; if(v[14]==="p")v[14]=0});
+  }
   function at(row){var x=it[Number(row)-2];if(!x)throw new Error("الهدف غير موجود.");return x}
   function fill(x,g){
     var type=String(g.type||"").trim(), cls=String(g.cls||"").trim(), time=Number(g.time), weekly=Number(g.weekly), daily=Number(g.daily);
@@ -654,7 +662,7 @@ async function call(name){
   }
   switch(name){
     case "api_init":
-      return {email:user,url:null,colors:d.colors,rows:it.map(function(v,i){return {row:i+2,v:v}})};
+      return {email:user,url:null,colors:d.colors,weekStart:d.weekStart,rows:it.map(function(v,i){return {row:i+2,v:v}})};
     case "api_setColor":
       var ck=String(a[0]||"").slice(0,80), cv=Number(a[1]);
       if(!ck||!(cv>=0&&cv<PALETTE.length))throw new Error("لون غير صحيح.");
@@ -670,11 +678,19 @@ async function call(name){
     case "api_newWeek":
       var date=String(a[0]||"");
       if(!/^\d{4}-\d{2}-\d{2}$/.test(date))throw new Error("تاريخ غير صحيح.");
-      if(it.some(function(v){return v.slice(6,13).some(Boolean)})){
-        if(d.hist.some(function(h){return h.date===date}))return {dup:true};
-        it.forEach(function(v){if(v[14]&&!v.slice(6,13).some(Boolean))return;d.hist.push({date:date,type:v[0],cls:v[1],time:v[2],weekly:v[3],daily:v[5],qty:v[4],days:v.slice(6,13),sched:v[13]||null})});
-      }
-      it.forEach(function(v){for(var k=6;k<13;k++)v[k]=false; if(v[14]==="p")v[14]=0});
+      if(it.some(function(v){return v.slice(6,13).some(Boolean)})&&d.hist.some(function(h){return h.date===date}))return {dup:true};
+      archiveWeek(date);
+      var cw0=currentWeekStart();
+      d.weekStart=(d.weekStart&&d.weekStart>=cw0)?shiftIso(d.weekStart,7):cw0;
+      break;
+    case "api_rollover":
+      var cw=String(a[0]||"");
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(cw))throw new Error("تاريخ غير صحيح.");
+      if(!d.weekStart){d.weekStart=cw;break}
+      if(d.weekStart>=cw)return {ok:true,rolled:false};
+      var old=d.weekStart;
+      archiveWeek(old);
+      d.weekStart=cw; res={ok:true,rolled:true,date:old};
       break;
     case "api_history":
       var w={};
@@ -683,7 +699,7 @@ async function call(name){
     default: throw new Error("طلب غير معروف.");
   }
   saveData(d);
-  return {ok:true};
+  return res||{ok:true};
 }
 
 /* ===== المزامنة مع السحابة (Supabase) ===== */
@@ -702,7 +718,7 @@ async function sbRpc(fn,args){
   return j;
 }
 function cEmpty(d){return !(d&&((d.items&&d.items.length)||(d.hist&&d.hist.length)))}
-function cNorm(d){return {items:Array.isArray(d&&d.items)?d.items:[],hist:Array.isArray(d&&d.hist)?d.hist:[],colors:d&&d.colors&&typeof d.colors==='object'&&!Array.isArray(d.colors)?d.colors:{}}}
+function cNorm(d){return {items:Array.isArray(d&&d.items)?d.items:[],hist:Array.isArray(d&&d.hist)?d.hist:[],colors:d&&d.colors&&typeof d.colors==='object'&&!Array.isArray(d.colors)?d.colors:{},weekStart:/^\d{4}-\d{2}-\d{2}$/.test((d&&d.weekStart)||'')?d.weekStart:''}}
 function cSchedule(){
   if(!cTok()||!user)return;
   cDirtySet(true); cMode=2;
@@ -745,7 +761,9 @@ async function cPull(force){
   }
   cPulling=false;
 }
-document.addEventListener("visibilitychange",function(){if(!document.hidden)cPull(false)});
+function maybeRoll(){if(user&&mcp&&wkStart&&wkStart<currentWeekStart()&&!pending)load()}
+document.addEventListener("visibilitychange",function(){if(!document.hidden){maybeRoll();cPull(false)}});
+setInterval(maybeRoll,60000);
 window.addEventListener("online",function(){if(cDirty)cSchedule();else cPull(true)});
 setInterval(function(){if(!document.hidden)cPull(false)},120000);
 
@@ -759,9 +777,11 @@ async function load(){
   if(pending>0)return;
   setStatus("busy","جارٍ التحديث…");
   try{
+    var rr=await call("api_rollover",currentWeekStart());
     var d=await call("api_init");
-    items=(d.rows||[]).map(function(r){return mk(r.v,r.row)}); colors=d.colors||{};
-    setAccount(d); banner(""); render(); sync();
+    items=(d.rows||[]).map(function(r){return mk(r.v,r.row)}); colors=d.colors||{}; wkStart=d.weekStart||"";
+    if(rr&&rr.rolled){hist=null;weekNote="بدأ أسبوع جديد، وحُفظ أسبوع "+fmtDate(rr.date)+" في السجل."}
+    setAccount(d); banner(weekNote); weekNote=""; render(); sync();
   }catch(e){setStatus("err","تعذّر التحديث");banner(explain(e));render()}
 }
 async function write(fn,args){
@@ -886,10 +906,11 @@ document.getElementById("delNo").addEventListener("click",function(){delDlg.clos
 document.getElementById("delYes").addEventListener("click",function(){delDlg.close();if(delRow!==null)deleteGoal(delRow)});
 /* السجل: أرشفة الأسبوع وعرضه */
 var HIST="السجل", SHORT=["س","ح","ن","ث","ر","خ"];
+function shiftIso(s,n){var m=s.split('-');return iso(new Date(+m[0],+m[1]-1,+m[2]+n))}
 function pad2(n){return ("0"+n).slice(-2)}
 function iso(d){return d.getFullYear()+"-"+pad2(d.getMonth()+1)+"-"+pad2(d.getDate())}
 function fmtDate(s){var m=s.split("-");return new Date(+m[0],+m[1]-1,+m[2]).toLocaleDateString("ar-EG",{day:"numeric",month:"long",year:"numeric"})}
-function defaultWeekStart(){var d=new Date(),back=((d.getDay()+1)%7)||7;d.setDate(d.getDate()-back);return iso(d)}
+function defaultWeekStart(){return wkStart||currentWeekStart()}
 function normDate(s){var m=String(s||"").trim().match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);return m?m[1]+"-"+pad2(m[2])+"-"+pad2(m[3]):""}
 async function readHistory(){
   var w=await call("api_history");
@@ -907,7 +928,7 @@ async function newWeek(date){
     var r=await call("api_newWeek",date);
     if(r&&r.dup){setStatus("err","لم يُحفظ");banner("أسبوع "+fmtDate(date)+" محفوظ في السجل من قبل. اختر تاريخًا آخر ثم أعد المحاولة.");return}
     items.forEach(function(i){i.days=[0,0,0,0,0,0,0]; if(i.st==='p')i.st=''});
-    hist=null; banner(""); render(); sync();
+    hist=null; banner(""); await load();
   }catch(e){setStatus("err","تعذّر الحفظ");banner(explain(e)+" لم يُمسح شيء.")}
 }
 document.getElementById("dlgNo").addEventListener("click",function(){dlg.close()});
@@ -923,7 +944,7 @@ function currentWeekStart(){var d=new Date();d.setDate(d.getDate()-((d.getDay()+
 function buildDayMap(){
   var weeks={}, map={};
   if(hist){Object.keys(hist.weeks).forEach(function(k){weeks[k]=hist.weeks[k]})}
-  var cw=currentWeekStart();
+  var cw=wkStart||currentWeekStart();
   if(!weeks[cw]){weeks[cw]=items.filter(function(i){return !i.st||i.days.some(Boolean)}).map(function(i){return {type:i.type,cls:i.cls,time:i.time,days:i.days,sched:i.sched}})}
   Object.keys(weeks).forEach(function(ws){
     var rows=weeks[ws], m=ws.split("-"), st=weekStats(rows);
