@@ -448,7 +448,7 @@ function fmtMins(m){
   if(!m)return "٠ د";
   return (h?a(h)+" س":"")+(h&&r?" و ":"")+(r?a(r)+" د":"");
 }
-function dayLabel(d){return DAYS[d%7]+" · "+dayDate(d).toLocaleDateString("ar-EG",{day:"numeric",month:"long"})+(d>=7&&sel<7?" · الأسبوع القادم":"")}
+function dayLabel(d){return DAYS[d%7]+" · "+dayDate(d).toLocaleDateString("ar-EG",{day:"numeric",month:"long"})}
 var partRow=null, partMode="f", view="main";
 var VIEWS={done:"المكتملة",later:"المؤجلة للأسبوع القادم",cancel:"الملغية"};
 function mk(r,row){
@@ -493,8 +493,9 @@ var ICON_EDIT='<svg viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16v4zM13.5 
 var ICON_DEL='<svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12h10l1-12M9 7V4h6v3"/></svg>';
 
 function missedInfo(){
-  var pos=todayIdx(), y=pos-1, yest=[], older=[], seen={};
+  var pos=(wkStart&&wkStart<currentWeekStart())?0:todayIdx(), y=pos-1, yest=[], older=[], seen={};
   items.forEach(function(i){
+    if(pct(i,0)>=100-1e-9)return;
     var ym=(y>=0&&active(i,y)&&!i.days[y]), om=[];
     for(var d=0;d<y;d++)if(active(i,d)&&!i.days[d])om.push(d);
     if(ym){yest.push(i);seen[i.row]=1}
@@ -546,7 +547,7 @@ function render(){
   function dayPct(d){var tot=0,done=0;items.forEach(function(i){if(d<7?active(i,d):planned(i,d)){tot+=i.time;done+=i.time*dayv(i,d)}});return tot?done/tot*100:0}
   document.getElementById("tabs").innerHTML=
     '<button type="button" class="tarr" data-dnav="-1" aria-label="اليوم السابق"'+(vi<=0?' disabled':'')+'><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>'+
-    '<button type="button" class="tab'+(sel===t?' today':'')+'" role="tab" aria-selected="true" data-dnav="today" title="العودة إلى اليوم"><span class="n">'+(nx?"الأسبوع القادم · ":(sel===t?"اليوم · ":""))+DAYS[dd]+' / '+fmtMins(dayMins(sel))+'</span></button>'+
+    '<button type="button" class="tab'+(sel===t?' today':'')+'" role="tab" aria-selected="true" data-dnav="today" title="العودة إلى اليوم"><span class="n">'+DAYS[dd]+' / '+fmtMins(dayMins(sel))+'</span></button>'+
     '<button type="button" class="tarr" data-dnav="1" aria-label="اليوم التالي"'+(vi>=nd.length-1?' disabled':'')+'><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button>';
   var wk=sel>=7?1:0, dd=sel%7;
   var live0=items.filter(function(i){return !i.st}), isDone0=function(i){return pct(i,0)>=100-1e-9};
@@ -564,7 +565,7 @@ function render(){
   var live=wk?items.filter(function(i){return i.st!=='c'}):live0, isDone=function(i){return pct(i,wk)>=100-1e-9};
   var dayItems=live.filter(function(i){return wk?planned(i,sel):active(i,sel)});
   var doneN=dayItems.filter(function(i){return dayv(i,sel)>=1}).length;
-  document.getElementById("sub").textContent=(wk?"الأسبوع القادم · ":"")+dayDate(sel).toLocaleDateString("ar-EG",{day:"numeric",month:"long",year:"numeric"})+" · أنجزت "+doneN+" من "+dayItems.length;
+  document.getElementById("sub").textContent=dayDate(sel).toLocaleDateString("ar-EG",{day:"numeric",month:"long",year:"numeric"})+" · أنجزت "+doneN+" من "+dayItems.length;
   var cand=dayItems.filter(function(i){return !isDone(i)});
   var todo=cand.filter(function(i){return dayv(i,sel)<1}), doneToday=cand.filter(function(i){return dayv(i,sel)>=1});
   var order=[], by={};
