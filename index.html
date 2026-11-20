@@ -313,7 +313,6 @@ a.mbtn[hidden]{display:none}
     <div class="pill" id="status"><span class="dot"></span><span id="statusTxt">جارٍ الاتصال بجوجل شيت…</span></div>
     <div class="menu">
       <button class="mbtn primary" id="addBtn" type="button"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>إضافة هدف</button>
-      <button class="mbtn danger" id="resetBtn" type="button"><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 109-9M3 4v5h5"/></svg>بدء أسبوع جديد</button>
     </div>
     <div class="week">
       <h3>إنجاز الأسبوع بالوقت</h3>
@@ -395,19 +394,6 @@ a.mbtn[hidden]{display:none}
     <button class="icon" id="histClose" type="button" aria-label="إغلاق"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
   </div>
   <div id="histBody"></div>
-</dialog>
-
-<dialog id="dlg">
-  <strong>بدء أسبوع جديد؟</strong>
-  <p style="margin:8px 0 0">يُحفظ الأسبوع الحالي في سجل الأسابيع، ثم يُمسح تحديد الأيام. الأهداف تبقى كما هي.</p>
-  <form class="add" style="grid-template-columns:1fr" onsubmit="return false">
-    <label>بداية الأسبوع المنتهي (السبت)<input id="wkDate" type="date" required></label>
-  </form>
-  <div class="err2" id="wkErr" role="alert"></div>
-  <div class="acts">
-    <button class="btn" id="dlgNo" type="button">إلغاء</button>
-    <button class="btn danger" id="dlgYes" type="button">مسح التحديد</button>
-  </div>
 </dialog>
 
 <script>
@@ -675,13 +661,6 @@ async function call(name){
       r=["","",0,0,"",0,false,false,false,false,false,false,false,null]; fill(r,a[0]); it.push(r); break;
     case "api_editGoal": fill(at(a[0]),a[1]); break;
     case "api_deleteGoal": at(a[0]); it.splice(Number(a[0])-2,1); break;
-    case "api_newWeek":
-      var date=String(a[0]||"");
-      if(!/^\d{4}-\d{2}-\d{2}$/.test(date))throw new Error("تاريخ غير صحيح.");
-      if(it.some(function(v){return v.slice(6,13).some(Boolean)})&&d.hist.some(function(h){return h.date===date}))return {dup:true};
-      archiveWeek(date);
-      var cw0=currentWeekStart();
-      d.weekStart=(d.weekStart&&d.weekStart>=cw0)?shiftIso(d.weekStart,7):cw0;
       break;
     case "api_rollover":
       var cw=String(a[0]||"");
@@ -858,7 +837,7 @@ async function deleteGoal(row){
   if(!ok){items=snap;render()}
 }
 
-var addDlg=document.getElementById("addDlg"), delDlg=document.getElementById("delDlg"), dlg=document.getElementById("dlg");
+var addDlg=document.getElementById("addDlg"), delDlg=document.getElementById("delDlg");
 var fSched=[false,false,false,false,false,false,false];
 function paintDays(){
   var custom=document.querySelector('input[name=fMode]:checked').value==="custom", box=document.getElementById("fDays");
@@ -906,12 +885,9 @@ document.getElementById("delNo").addEventListener("click",function(){delDlg.clos
 document.getElementById("delYes").addEventListener("click",function(){delDlg.close();if(delRow!==null)deleteGoal(delRow)});
 /* السجل: أرشفة الأسبوع وعرضه */
 var HIST="السجل", SHORT=["س","ح","ن","ث","ر","خ"];
-function shiftIso(s,n){var m=s.split('-');return iso(new Date(+m[0],+m[1]-1,+m[2]+n))}
 function pad2(n){return ("0"+n).slice(-2)}
 function iso(d){return d.getFullYear()+"-"+pad2(d.getMonth()+1)+"-"+pad2(d.getDate())}
 function fmtDate(s){var m=s.split("-");return new Date(+m[0],+m[1]-1,+m[2]).toLocaleDateString("ar-EG",{day:"numeric",month:"long",year:"numeric"})}
-function defaultWeekStart(){return wkStart||currentWeekStart()}
-function normDate(s){var m=String(s||"").trim().match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);return m?m[1]+"-"+pad2(m[2])+"-"+pad2(m[3]):""}
 async function readHistory(){
   var w=await call("api_history");
   return {weeks:w||{}};
@@ -921,22 +897,6 @@ function weekStats(rows){
   var vd=[0,1,2,3,4,5].concat(dp[6]>0||rows.some(function(i){return i.sched&&i.sched[6]})?[6]:[]);
   return {dp:dp,overall:vd.reduce(function(a,d){return a+dp[d]},0)/vd.length};
 }
-async function newWeek(date){
-  if(!need())return;
-  setStatus("busy","جارٍ حفظ الأسبوع في السجل…");
-  try{
-    var r=await call("api_newWeek",date);
-    if(r&&r.dup){setStatus("err","لم يُحفظ");banner("أسبوع "+fmtDate(date)+" محفوظ في السجل من قبل. اختر تاريخًا آخر ثم أعد المحاولة.");return}
-    items.forEach(function(i){i.days=[0,0,0,0,0,0,0]; if(i.st==='p')i.st=''});
-    hist=null; banner(""); await load();
-  }catch(e){setStatus("err","تعذّر الحفظ");banner(explain(e)+" لم يُمسح شيء.")}
-}
-document.getElementById("dlgNo").addEventListener("click",function(){dlg.close()});
-document.getElementById("dlgYes").addEventListener("click",async function(){
-  var date=document.getElementById("wkDate").value, err=document.getElementById("wkErr");
-  if(!normDate(date)){err.textContent="اختر تاريخ بداية الأسبوع.";return}
-  dlg.close(); await newWeek(date);
-});
 
 var histDlg=document.getElementById("histDlg"), histBody=document.getElementById("histBody"), histTitle=document.getElementById("histTitle"), histBack=document.getElementById("histBack"), hist=null;
 var calY=0, calM=0, calSel="";
@@ -1022,11 +982,6 @@ window.addEventListener("resize",function(){setDrawer(false)});
 document.addEventListener("keydown",function(e){if(e.key==="Escape"&&drawerOpen)setDrawer(false)});
 function fromMenu(fn){return function(){setDrawer(false);fn()}}
 document.getElementById("addBtn").addEventListener("click",fromMenu(function(){openForm(null)}));
-document.getElementById("resetBtn").addEventListener("click",fromMenu(function(){
-  document.getElementById("wkDate").value=defaultWeekStart();
-  document.getElementById("wkErr").textContent="";
-  dlg.showModal();
-}));
 
 /* الوضع الليلي والنهاري */
 var ICON_MOON='<svg viewBox="0 0 24 24" width="20" height="20"><path d="M20 14.5A8 8 0 019.5 4 8 8 0 1020 14.5z"/></svg>';
