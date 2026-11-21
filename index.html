@@ -201,6 +201,28 @@ body.dragging *{cursor:grabbing!important}
 /* النوافذ */
 dialog{border:1px solid var(--line);border-radius:14px;background:var(--surface);color:var(--ink);font-family:var(--font-body);padding:20px;max-width:380px;width:calc(100% - 24px)}
 dialog::backdrop{background:rgba(0,0,0,.4)}
+dialog.wz{max-width:480px}
+.wzh{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.wzh span{font-size:12px;color:var(--muted)}
+.wzb{margin-top:12px;max-height:62vh;overflow:auto;padding:2px}
+.wzb h4{margin:0 0 4px;font-size:16px}
+.wzb p{margin:0 0 10px;font-size:13px;color:var(--muted);line-height:1.7}
+.wchoice{display:flex;flex-direction:column;gap:8px}
+.wchoice button{text-align:start;padding:11px 12px;border:1px solid var(--line);border-radius:12px;background:var(--bg)}
+.wchoice button b{display:block;font-size:15px}
+.wchoice button small{display:block;color:var(--muted);font-size:12.5px;line-height:1.6}
+.wchoice button[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft)}
+.wrow2{display:grid;grid-template-columns:1fr 78px auto auto;gap:6px;align-items:center;margin-bottom:8px}
+.wrow2 input,.wnum{font:inherit;font-size:16px;color:var(--ink);padding:8px 9px;border:1px solid var(--line);border-radius:9px;background:var(--bg);width:100%}
+.wrow2 input:focus,.wnum:focus{border-color:var(--accent);outline:0}
+.wrow2 small{color:var(--muted)}
+.wadd{border:1px dashed var(--line);background:none;border-radius:10px;padding:7px 12px;color:var(--accent);width:100%}
+.wbud{margin:10px 0;padding:9px 10px;border-radius:10px;background:var(--bg);border:1px solid var(--line);font-size:13px}
+.wbud .track{margin-top:6px}
+.wbud.over{border-color:var(--bad);color:var(--bad)}
+.wsum{border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-bottom:10px}
+.wsum .mh{display:flex;justify-content:space-between;padding:8px 10px;background:var(--bg);font-weight:600}
+.wsum .sr{display:flex;justify-content:space-between;padding:6px 10px;border-top:1px solid var(--line);font-size:14px}
 dialog .acts{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
 .btn{padding:8px 16px;border-radius:10px;border:1px solid var(--line);background:var(--surface);min-height:40px}
 .btn:hover{border-color:var(--accent)}
@@ -325,6 +347,7 @@ a.mbtn[hidden]{display:none}
     <div class="pill" id="status"><span class="dot"></span><span id="statusTxt">جارٍ الاتصال بجوجل شيت…</span></div>
     <div class="menu">
       <button class="mbtn primary" id="addBtn" type="button"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>إضافة هدف</button>
+      <button class="mbtn" id="wizBtn" type="button"><svg viewBox="0 0 24 24"><path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8L12 3zM18 15l.8 2.2L21 18l-2.2.8L18 21l-.8-2.2L15 18l2.2-.8L18 15z"/></svg>المساعد في تحديد الأهداف</button>
     </div>
     <div class="week">
       <h3>إنجاز الأسبوع بالوقت</h3>
@@ -363,6 +386,17 @@ a.mbtn[hidden]{display:none}
     </nav></div>
   </div>
 </div>
+
+<dialog id="wizDlg" class="wz">
+  <div class="wzh"><strong>المساعد في تحديد الأهداف</strong><span id="wizStep"></span></div>
+  <div class="wzb" id="wizBody"></div>
+  <div class="err2" id="wizErr" role="alert"></div>
+  <div class="acts">
+    <button class="btn" id="wizCancel" type="button">إلغاء</button>
+    <button class="btn" id="wizBack" type="button">رجوع</button>
+    <button class="btn primary" id="wizNext" type="button">التالي</button>
+  </div>
+</dialog>
 
 <dialog id="addDlg">
   <strong id="addTitle">إضافة هدف جديد</strong>
@@ -712,6 +746,17 @@ async function call(name){
       if(!Array.isArray(ro)||ro.length!==it.length)throw new Error("ترتيب غير صحيح.");
       var rs={}, rn=ro.map(function(r){var k=Number(r)-2;if(!(k>=0&&k<it.length)||rs[k])throw new Error("ترتيب غير صحيح.");rs[k]=1;return it[k]});
       it.length=0; rn.forEach(function(x){it.push(x)}); break;
+    case "api_wizard":
+      var wzp=a[0]||{}, wgl=Array.isArray(wzp.goals)?wzp.goals:[];
+      if(!wgl.length)throw new Error("لا توجد أهداف لإضافتها.");
+      var wkeys={}; wgl.forEach(function(g){wkeys[String(g.type||"").trim()+"\u0001"+String(g.cls||"").trim()]=1});
+      if(wzp.mode==="new"){
+        for(var wq=it.length-1;wq>=0;wq--)if(wkeys[String(it[wq][0]).trim()+"\u0001"+String(it[wq][1]).trim()])it.splice(wq,1);
+        it.forEach(function(x){padNx(x);x[14]="c"});
+      }else if(it.some(function(x){return wkeys[String(x[0]).trim()+"\u0001"+String(x[1]).trim()]}))throw new Error("بعض البنود موجودة في أهدافك بنفس الاسم.");
+      if(it.length+wgl.length>40)throw new Error("وصلت للحد الأقصى: 40 هدفًا.");
+      wgl.forEach(function(g){var wr=["","",0,0,"",0,false,false,false,false,false,false,false,null]; fill(wr,g); it.push(wr)});
+      break;
     case "api_setStatus": at(a[0])[14]=a[1]==="c"||a[1]==="p"?a[1]:0; break;
     case "api_setDay":
       var sd=Number(a[1]), sx=at(a[0]);
@@ -1136,6 +1181,148 @@ scrim.addEventListener("click",function(){setDrawer(false)});
 window.addEventListener("resize",function(){setDrawer(false)});
 document.addEventListener("keydown",function(e){if(e.key==="Escape"&&drawerOpen)setDrawer(false)});
 function fromMenu(fn){return function(){setDrawer(false);fn()}}
+/* المساعد في تحديد الأهداف */
+var wizDlg=document.getElementById("wizDlg"), wzBody=document.getElementById("wizBody"), wzErr=document.getElementById("wizErr"), wzBackB=document.getElementById("wizBack"), wzNextB=document.getElementById("wizNext"), wz=null;
+function wzSteps(){var st=["mode","time","mains"]; wz.mains.forEach(function(_,k){st.push("sub"+k)}); st.push("review"); return st}
+function wzTotal(){return Math.round((Number(wz.hours)||0)*60)}
+function wzSum(list){return list.reduce(function(a,x){return a+(Number(x.mins)||0)},0)}
+function wzOpen(){
+  wz={step:0,mode:"add",hours:4,days:[true,true,true,true,true,true,false],mains:[{name:"",mins:120,subs:[]}]};
+  if(!items.length)wz.mode="add";
+  wzRender(); wizDlg.showModal();
+}
+function wzRows(list,kind,k,ph){
+  return list.map(function(x,j){
+    return '<div class="wrow2"><input data-f="'+kind+'n" data-i="'+(k===undefined?j:k)+'" data-j="'+j+'" value="'+esc(x.name)+'" placeholder="'+ph+'" maxlength="60" aria-label="'+ph+'">'+
+      '<input type="number" data-f="'+kind+'m" data-i="'+(k===undefined?j:k)+'" data-j="'+j+'" value="'+(x.mins||"")+'" inputmode="numeric" min="5" step="5" aria-label="الدقائق في اليوم"><small>د</small>'+
+      (list.length>1||kind==="s"?'<button type="button" class="icon sm del" data-wz="del'+kind+'" data-i="'+(k===undefined?j:k)+'" data-j="'+j+'" aria-label="حذف">'+ICON_DEL+'</button>':'<span></span>')+'</div>';
+  }).join("");
+}
+function wzRender(){
+  var steps=wzSteps(), st=steps[wz.step], h="", last=wz.step===steps.length-1;
+  document.getElementById("wizStep").textContent="الخطوة "+ar(wz.step+1)+" من "+ar(steps.length);
+  if(st==="mode"){
+    h='<h4>مرحبًا بك</h4><p>سأسألك عن وقتك وأهدافك، ثم أبني لك الخطة وأضعها في جدولك. ماذا تريد؟</p><div class="wchoice">'+
+      '<button type="button" data-wz="mode" data-v="new" aria-pressed="'+(wz.mode==="new")+'"><b>خطة جديدة من الصفر</b><small>'+(items.length?'تنتقل أهدافك الحالية إلى «الملغية» ويمكنك استرجاعها لاحقًا.':'لا توجد أهداف حالية، فتبدأ بخطتك الجديدة.')+'</small></button>'+
+      '<button type="button" data-wz="mode" data-v="add" aria-pressed="'+(wz.mode==="add")+'"><b>إضافة إلى أهدافي الحالية</b><small>تُضاف الأهداف الجديدة بجانب أهدافك دون المساس بها.</small></button></div>';
+  }else if(st==="time"){
+    h='<h4>وقتك</h4><p>كم ساعة تذاكر في اليوم؟ وفي أي أيام؟</p>'+
+      '<label style="font-size:13px;color:var(--muted)">عدد الساعات في اليوم<input class="wnum" id="wzHours" type="number" min="0.5" max="16" step="0.5" inputmode="decimal" value="'+wz.hours+'" style="margin-top:3px"></label>'+
+      '<div class="sched" style="margin-top:12px"><span>أيام الدراسة</span><div class="dchips">'+DAYS.map(function(n,d){return '<button type="button" data-wz="day" data-d="'+d+'" aria-pressed="'+wz.days[d]+'">'+n+'</button>'}).join("")+'</div></div>'+
+      '<div class="wbud" id="wzBud"></div>';
+  }else if(st==="mains"){
+    h='<h4>أهدافك الأساسية</h4><p>اكتب هدفًا أو اثنين أو ثلاثة (حتى خمسة)، وحدّد لكل هدف دقائقه في اليوم.</p>'+
+      wzRows(wz.mains,"m",undefined,"مثل: حفظ القرآن")+
+      (wz.mains.length<5?'<button type="button" class="wadd" data-wz="addm">+ هدف أساسي آخر</button>':'')+'<div class="wbud" id="wzBud"></div>';
+  }else if(st==="review"){
+    var g=wzGoals(), nd=wz.days.filter(Boolean).length;
+    h='<h4>مراجعة الخطة</h4><p>'+ar(nd)+(nd>10?' يومًا':' أيام')+' في الأسبوع · '+fmtMins(wzTotal())+' في اليوم. اضغط «إنشاء الخطة» لتُضاف إلى جدولك.</p>';
+    wz.mains.forEach(function(m){
+      var subs=m.subs.filter(wzFilled);
+      h+='<div class="wsum"><div class="mh"><span>'+esc(m.name)+'</span><span>'+fmtMins(Number(m.mins))+'</span></div>'+
+        (subs.length?subs.map(function(x){return '<div class="sr"><span>'+esc(x.name)+'</span><span>'+fmtMins(Number(x.mins))+'</span></div>'}).join(""):'<div class="sr"><span style="color:var(--muted)">بدون أهداف فرعية</span><span></span></div>')+'</div>';
+    });
+    if(wz.mode==="new"&&items.length)h+='<p>ستنتقل أهدافك الحالية ('+ar(items.length)+') إلى «الملغية».</p>';
+  }else{
+    var k=+st.slice(3), m=wz.mains[k];
+    h='<h4>الأهداف الفرعية: '+esc(m.name)+'</h4><p>وقته '+fmtMins(Number(m.mins))+' في اليوم. وزّعه على بنوده، ويمكنك ترك القائمة فارغة إن لم يكن له أهداف فرعية.</p>'+
+      wzRows(m.subs,"s",k,"اسم الهدف الفرعي")+'<button type="button" class="wadd" data-wz="adds" data-i="'+k+'">+ هدف فرعي</button><div class="wbud" id="wzBud"></div>';
+  }
+  wzBody.innerHTML=h; wzErr.textContent="";
+  wzBackB.hidden=wz.step===0; wzNextB.textContent=last?"إنشاء الخطة":"التالي";
+  wzBudget();
+}
+function wzFilled(x){return String(x.name||"").trim()||Number(x.mins)>0}
+function wzBudget(){
+  var el=document.getElementById("wzBud"); if(!el)return;
+  var st=wzSteps()[wz.step], used, cap, label;
+  if(st==="time"){used=0;cap=wzTotal();el.className="wbud";el.innerHTML='إجمالي وقتك: <b>'+fmtMins(cap)+'</b> في اليوم · نحو <b>'+fmtMins(cap*wz.days.filter(Boolean).length)+'</b> في الأسبوع';return}
+  if(st==="mains"){used=wzSum(wz.mains);cap=wzTotal();label="وزّعت"}
+  else{var m=wz.mains[+st.slice(3)];used=wzSum(m.subs.filter(wzFilled));cap=Number(m.mins)||0;label="وزّعت"}
+  var left=cap-used;
+  el.className="wbud"+(left<0?" over":"");
+  el.innerHTML=label+' <b>'+fmtMins(used)+'</b> من <b>'+fmtMins(cap)+'</b> · '+(left<0?'تجاوزت بمقدار '+fmtMins(-left):'المتبقي '+fmtMins(left))+
+    '<div class="track"><i style="width:'+Math.min(100,cap?used/cap*100:0)+'%;background:'+(left<0?'var(--bad)':'var(--accent)')+'"></i></div>';
+}
+function wzGoals(){
+  var nd=wz.days.filter(Boolean).length, std=[true,true,true,true,true,true,false], same=wz.days.every(function(v,d){return v===std[d]});
+  var sched=same?null:wz.days.slice(), out=[];
+  wz.mains.forEach(function(m){
+    var subs=m.subs.filter(wzFilled), t=String(m.name).trim();
+    if(!subs.length)out.push({type:t,cls:t,time:Number(m.mins),weekly:nd,daily:1,qty:"",sched:sched});
+    else subs.forEach(function(x){out.push({type:t,cls:String(x.name).trim(),time:Number(x.mins),weekly:nd,daily:1,qty:"",sched:sched})});
+  });
+  return out;
+}
+function wzCheck(st){
+  if(st==="time"){
+    if(!(Number(wz.hours)>0&&Number(wz.hours)<=16))return "اكتب عدد ساعات صحيحًا (بين نصف ساعة و16 ساعة).";
+    if(!wz.days.some(Boolean))return "اختر يومًا واحدًا على الأقل.";
+  }else if(st==="mains"){
+    var seen={};
+    for(var i=0;i<wz.mains.length;i++){
+      var m=wz.mains[i], n=String(m.name).trim();
+      if(!n)return "اكتب اسم كل هدف أساسي.";
+      if(!(Number(m.mins)>0))return "حدّد دقائق «"+n+"».";
+      if(seen[n])return "الاسم «"+n+"» مكرر.";
+      seen[n]=1;
+    }
+    if(wzSum(wz.mains)>wzTotal())return "مجموع أوقات الأهداف الأساسية أكبر من وقتك اليومي.";
+  }else if(st.slice(0,3)==="sub"){
+    var mm=wz.mains[+st.slice(3)], seen2={}, rows=mm.subs.filter(wzFilled);
+    for(var j=0;j<rows.length;j++){
+      var nn=String(rows[j].name||"").trim();
+      if(!nn)return "اكتب اسم كل هدف فرعي أو احذف السطر الفارغ.";
+      if(!(Number(rows[j].mins)>0))return "حدّد دقائق «"+nn+"».";
+      if(seen2[nn])return "الاسم «"+nn+"» مكرر.";
+      seen2[nn]=1;
+    }
+    if(wzSum(rows)>Number(mm.mins))return "مجموع الأهداف الفرعية أكبر من وقت «"+mm.name+"».";
+  }else if(st==="review"){
+    var goals=wzGoals(), keys={};
+    goals.forEach(function(g){keys[g.type+"\u0001"+g.cls]=1});
+    var rest=items.filter(function(i){return !keys[i.type+"\u0001"+i.cls]});
+    if(wz.mode==="add"&&rest.length<items.length)return "بعض البنود موجودة في أهدافك بنفس الاسم، غيّر أسماءها أو اختر «خطة جديدة».";
+    if((wz.mode==="new"?rest.length:items.length)+goals.length>40)return "الخطة تتجاوز الحد الأقصى (40 هدفًا في الجدول). احذف أهدافًا قديمة أو قلّل بنود الخطة.";
+  }
+  return "";
+}
+async function wzCreate(){
+  var goals=wzGoals(), mode=wz.mode;
+  wizDlg.close(); wz=null;
+  if(!need())return;
+  var ok=await write("api_wizard",[{mode:mode,goals:goals}]);
+  if(ok){await load(); banner("تم إنشاء خطتك: أُضيف "+ar(goals.length)+(goals.length>10?" هدفًا":" أهداف")+" إلى جدولك.")}
+}
+wzNextB.addEventListener("click",function(){
+  var st=wzSteps()[wz.step], err=wzCheck(st); if(err){wzErr.textContent=err;return}
+  if(st==="review"){wzCreate();return}
+  wz.step++; wzRender();
+});
+wzBackB.addEventListener("click",function(){if(wz.step>0){wz.step--;wzRender()}});
+document.getElementById("wizCancel").addEventListener("click",function(){wizDlg.close()});
+wizDlg.addEventListener("close",function(){});
+wzBody.addEventListener("input",function(e){
+  var t=e.target, f=t.dataset&&t.dataset.f; 
+  if(t.id==="wzHours"){wz.hours=t.value;wzBudget();return}
+  if(!f)return;
+  var i=+t.dataset.i, j=+t.dataset.j;
+  if(f==="mn")wz.mains[i].name=t.value; else if(f==="mm")wz.mains[i].mins=t.value;
+  else if(f==="sn")wz.mains[i].subs[j].name=t.value; else if(f==="sm")wz.mains[i].subs[j].mins=t.value;
+  wzBudget();
+});
+wzBody.addEventListener("click",function(e){
+  var b=e.target.closest&&e.target.closest("[data-wz]"); if(!b)return;
+  var a=b.dataset.wz, i=+b.dataset.i, j=+b.dataset.j;
+  if(a==="mode")wz.mode=b.dataset.v;
+  else if(a==="day")wz.days[+b.dataset.d]=!wz.days[+b.dataset.d];
+  else if(a==="addm"){if(wz.mains.length<5)wz.mains.push({name:"",mins:60,subs:[]})}
+  else if(a==="delm")wz.mains.splice(i,1);
+  else if(a==="adds")wz.mains[i].subs.push({name:"",mins:30});
+  else if(a==="dels")wz.mains[i].subs.splice(j,1);
+  wzRender();
+});
+document.getElementById("wizBtn").addEventListener("click",fromMenu(wzOpen));
 document.getElementById("addBtn").addEventListener("click",fromMenu(function(){openForm(null)}));
 
 /* الوضع الليلي والنهاري */
