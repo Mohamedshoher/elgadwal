@@ -103,7 +103,6 @@ h1{font-family:var(--font-display);font-size:26px;line-height:1.2;margin:0}
 .icon.sm:hover{color:var(--accent);background:var(--accent-soft)}
 .icon.sm.del:hover{color:var(--bad);background:transparent;border-color:var(--bad)}
 #menuBtn{display:none}
-.topdot{margin-inline-start:auto;display:none}
 .banner{background:var(--gold-soft);border:1px solid var(--gold);border-radius:12px;padding:10px 14px;margin-bottom:12px;font-size:14px}
 .banner[hidden]{display:none}
 
@@ -298,7 +297,6 @@ a.mbtn[hidden]{display:none}
   .scrim{display:block;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:20;opacity:0;pointer-events:none;transition:opacity .25s}
   .scrim.show{opacity:1;pointer-events:auto}
   #menuBtn{display:inline-flex}
-  .topdot{display:block}
   .main{padding:12px 12px 96px}
   .fwrap{right:0!important}
 }
@@ -373,7 +371,6 @@ a.mbtn[hidden]{display:none}
         <div class="sub" id="sub"></div>
       </div>
       <button class="icon bell" id="bellBtn" type="button" title="ما فاتك" aria-label="ما فاتك من أهداف"><svg viewBox="0 0 24 24"><path d="M6 17h12l-1.5-2V10a4.5 4.5 0 10-9 0v5L6 17zM10 20h4"/></svg><span class="badge" id="bellBadge" hidden>0</span></button>
-      <span class="topdot pill" id="topStatus" style="padding:6px 8px" aria-hidden="true"><span class="dot"></span></span>
     </header>
     <div class="banner" id="banner" hidden role="status"></div>
     <nav class="tabs" id="tabs" role="tablist" aria-label="أيام الأسبوع"></nav>
@@ -681,7 +678,6 @@ function vrowHtml(i){
 /* الحالة والأخطاء */
 function setStatus(kind,txt){
   document.getElementById("status").className="pill "+kind;
-  document.getElementById("topStatus").className="topdot pill "+kind;
   document.getElementById("statusTxt").textContent=txt;
 }
 function banner(txt){var b=document.getElementById("banner");if(txt){b.textContent=txt;b.hidden=false}else b.hidden=true}
