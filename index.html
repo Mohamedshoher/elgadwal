@@ -216,6 +216,7 @@ dialog.wz{max-width:480px}
 .wrow2 input,.wnum{font:inherit;font-size:16px;color:var(--ink);padding:8px 9px;border:1px solid var(--line);border-radius:9px;background:var(--bg);width:100%}
 .wrow2 input:focus,.wnum:focus{border-color:var(--accent);outline:0}
 .wrow2 small{color:var(--muted)}
+.wrow2 .wq{grid-column:1/-1;font-size:14px;padding:6px 9px}
 .wadd{border:1px dashed var(--line);background:none;border-radius:10px;padding:7px 12px;color:var(--accent);width:100%}
 .wbud{margin:10px 0;padding:9px 10px;border-radius:10px;background:var(--bg);border:1px solid var(--line);font-size:13px}
 .wbud .track{margin-top:6px}
@@ -1187,7 +1188,7 @@ function wzSteps(){var st=["mode","time","mains"]; wz.mains.forEach(function(_,k
 function wzTotal(){return Math.round((Number(wz.hours)||0)*60)}
 function wzSum(list){return list.reduce(function(a,x){return a+(Number(x.mins)||0)},0)}
 function wzOpen(){
-  wz={step:0,mode:"add",hours:4,days:[true,true,true,true,true,true,false],mains:[{name:"",mins:120,subs:[]}]};
+  wz={step:0,mode:"add",hours:4,days:[true,true,true,true,true,true,false],mains:[{name:"",mins:120,qty:"",subs:[]}]};
   if(!items.length)wz.mode="add";
   wzRender(); wizDlg.showModal();
 }
@@ -1195,7 +1196,8 @@ function wzRows(list,kind,k,ph){
   return list.map(function(x,j){
     return '<div class="wrow2"><input data-f="'+kind+'n" data-i="'+(k===undefined?j:k)+'" data-j="'+j+'" value="'+esc(x.name)+'" placeholder="'+ph+'" maxlength="60" aria-label="'+ph+'">'+
       '<input type="number" data-f="'+kind+'m" data-i="'+(k===undefined?j:k)+'" data-j="'+j+'" value="'+(x.mins||"")+'" inputmode="numeric" min="5" step="5" aria-label="الدقائق في اليوم"><small>د</small>'+
-      (list.length>1||kind==="s"?'<button type="button" class="icon sm del" data-wz="del'+kind+'" data-i="'+(k===undefined?j:k)+'" data-j="'+j+'" aria-label="حذف">'+ICON_DEL+'</button>':'<span></span>')+'</div>';
+      (list.length>1||kind==="s"?'<button type="button" class="icon sm del" data-wz="del'+kind+'" data-i="'+(k===undefined?j:k)+'" data-j="'+j+'" aria-label="حذف">'+ICON_DEL+'</button>':'<span></span>')+
+      '<input class="wq" data-f="'+kind+'q" data-i="'+(k===undefined?j:k)+'" data-j="'+j+'" value="'+esc(x.qty||"")+'" placeholder="'+(kind==="m"?"الكم (يُستعمل إن لم تضف أهدافًا فرعية) مثل: 1-40":"الكم مثل: 1-40 أو 3 صفحات")+'" maxlength="60" aria-label="الكم"></div>';
   }).join("");
 }
 function wzRender(){
@@ -1219,8 +1221,8 @@ function wzRender(){
     h='<h4>مراجعة الخطة</h4><p>'+ar(nd)+(nd>10?' يومًا':' أيام')+' في الأسبوع · '+fmtMins(wzTotal())+' في اليوم. اضغط «إنشاء الخطة» لتُضاف إلى جدولك.</p>';
     wz.mains.forEach(function(m){
       var subs=m.subs.filter(wzFilled);
-      h+='<div class="wsum"><div class="mh"><span>'+esc(m.name)+'</span><span>'+fmtMins(Number(m.mins))+'</span></div>'+
-        (subs.length?subs.map(function(x){return '<div class="sr"><span>'+esc(x.name)+'</span><span>'+fmtMins(Number(x.mins))+'</span></div>'}).join(""):'<div class="sr"><span style="color:var(--muted)">بدون أهداف فرعية</span><span></span></div>')+'</div>';
+      h+='<div class="wsum"><div class="mh"><span>'+esc(m.name)+(!subs.length&&m.qty&&String(m.qty).trim()?' <small style="color:var(--muted);font-weight:400">· '+esc(String(m.qty).trim())+'</small>':'')+'</span><span>'+fmtMins(Number(m.mins))+'</span></div>'+
+        (subs.length?subs.map(function(x){return '<div class="sr"><span>'+esc(x.name)+(x.qty&&String(x.qty).trim()?' <small style="color:var(--muted)">· '+esc(String(x.qty).trim())+'</small>':'')+'</span><span>'+fmtMins(Number(x.mins))+'</span></div>'}).join(""):'<div class="sr"><span style="color:var(--muted)">بدون أهداف فرعية</span><span></span></div>')+'</div>';
     });
     if(wz.mode==="new"&&items.length)h+='<p>ستنتقل أهدافك الحالية ('+ar(items.length)+') إلى «الملغية».</p>';
   }else{
@@ -1249,8 +1251,8 @@ function wzGoals(){
   var sched=same?null:wz.days.slice(), out=[];
   wz.mains.forEach(function(m){
     var subs=m.subs.filter(wzFilled), t=String(m.name).trim();
-    if(!subs.length)out.push({type:t,cls:t,time:Number(m.mins),weekly:nd,daily:1,qty:"",sched:sched});
-    else subs.forEach(function(x){out.push({type:t,cls:String(x.name).trim(),time:Number(x.mins),weekly:nd,daily:1,qty:"",sched:sched})});
+    if(!subs.length)out.push({type:t,cls:t,time:Number(m.mins),weekly:nd,daily:1,qty:String(m.qty||"").trim(),sched:sched});
+    else subs.forEach(function(x){out.push({type:t,cls:String(x.name).trim(),time:Number(x.mins),weekly:nd,daily:1,qty:String(x.qty||"").trim(),sched:sched})});
   });
   return out;
 }
@@ -1307,7 +1309,7 @@ wzBody.addEventListener("input",function(e){
   if(t.id==="wzHours"){wz.hours=t.value;wzBudget();return}
   if(!f)return;
   var i=+t.dataset.i, j=+t.dataset.j;
-  if(f==="mn")wz.mains[i].name=t.value; else if(f==="mm")wz.mains[i].mins=t.value;
+  if(f==="mn")wz.mains[i].name=t.value; else if(f==="mm")wz.mains[i].mins=t.value; else if(f==="mq")wz.mains[i].qty=t.value; else if(f==="sq")wz.mains[i].subs[j].qty=t.value;
   else if(f==="sn")wz.mains[i].subs[j].name=t.value; else if(f==="sm")wz.mains[i].subs[j].mins=t.value;
   wzBudget();
 });
@@ -1316,9 +1318,9 @@ wzBody.addEventListener("click",function(e){
   var a=b.dataset.wz, i=+b.dataset.i, j=+b.dataset.j;
   if(a==="mode")wz.mode=b.dataset.v;
   else if(a==="day")wz.days[+b.dataset.d]=!wz.days[+b.dataset.d];
-  else if(a==="addm"){if(wz.mains.length<5)wz.mains.push({name:"",mins:60,subs:[]})}
+  else if(a==="addm"){if(wz.mains.length<5)wz.mains.push({name:"",mins:60,qty:"",subs:[]})}
   else if(a==="delm")wz.mains.splice(i,1);
-  else if(a==="adds")wz.mains[i].subs.push({name:"",mins:30});
+  else if(a==="adds")wz.mains[i].subs.push({name:"",mins:30,qty:""});
   else if(a==="dels")wz.mains[i].subs.splice(j,1);
   wzRender();
 });
