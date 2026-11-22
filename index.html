@@ -191,6 +191,21 @@ body.dragging *{cursor:grabbing!important}
 .qty.empty{color:var(--muted)}
 .qty:hover{border-color:var(--accent)}
 .qin{font:inherit;font-size:16px;width:100%;max-width:220px;padding:5px 8px;border:1px solid var(--accent);border-radius:8px;background:var(--bg);color:var(--ink)}
+.l2.acts{gap:4px;margin-top:5px;align-items:center}
+.l2.acts .qty{margin-inline-end:4px}
+.subcnt{font-size:12px;font-weight:600;color:var(--tc,var(--accent));background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:0 8px;flex:none}
+.subs{margin-top:8px;display:flex;flex-direction:column;gap:5px}
+.sub{display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:10px;background:var(--bg);border:1px solid var(--line)}
+.stk{width:22px;height:22px;border-radius:50%;border:2px solid var(--line);background:var(--surface);color:transparent;padding:0;display:flex;align-items:center;justify-content:center;flex:none}
+.stk svg{width:12px;height:12px;stroke-width:3.4}
+.stk[aria-pressed="true"]{background:var(--tc,var(--accent));border-color:var(--tc,var(--accent));color:#fff}
+.sub .st{flex:1;min-width:0;overflow-wrap:anywhere;font-size:14px}
+.sub.done .st{color:var(--muted);text-decoration:line-through;text-decoration-color:var(--line)}
+.sdel{border:0;background:none;color:var(--muted);font-size:20px;line-height:1;padding:0 4px}
+.sdel:hover{color:var(--bad)}
+.subadd{display:flex;gap:6px}
+.subadd input{flex:1;min-width:0;font:inherit;font-size:16px;color:var(--ink);padding:8px 10px;border:1px solid var(--line);border-radius:9px;background:var(--surface)}
+.subadd input:focus{border-color:var(--accent);outline:0}
 .pct{margin-inline-start:auto;font-weight:600;color:var(--ink)}
 .track{height:4px;border-radius:3px;background:var(--line);overflow:hidden;margin-top:6px}
 .track i{display:block;height:100%;border-radius:3px;transition:width .25s}
@@ -487,6 +502,7 @@ function groupHead(g,right){
     return '<button type="button" class="sw'+(k===c?' on':'')+'" style="background:'+col+'" data-pick="'+k+'" data-type="'+encodeURIComponent(g)+'" aria-label="'+PALNAMES[k]+'" aria-pressed="'+(k===c)+'"></button>'}).join("")+'</div>';
   return head;
 }
+var ICON_SUBS='<svg viewBox="0 0 24 24"><path d="M4 6h10M4 12h10M4 18h6M18 14v6M15 17h6"/></svg>';
 var ICON_NEXT='<svg viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>';
 function fmtMins(m){
   var h=Math.floor(m/60), r=Math.round(m%60), a=function(n){return Number(n).toLocaleString("ar-EG",{useGrouping:false})};
@@ -502,6 +518,7 @@ function mk(r,row){
     qty:String(r[4]==null?"":r[4]),daily:num(r[5]),days:[0,1,2,3,4,5,6].map(function(k){return dv(r[6+k])}),
     sched:normSched(r[13]),st:r[14]==='c'||r[14]==='p'?r[14]:'',
     nd:[0,1,2,3,4,5,6].map(function(k){return dv(Array.isArray(r[15])?r[15][k]:0)}),ov:normOv(r[16],14),
+    subs:(Array.isArray(r[18])?r[18]:[]).map(function(x){var n=Number(x&&x[1]);return {t:String((x&&x[0])||"").trim(),x:isFinite(n)?n:-1}}).filter(function(x){return x.t}),ad:typeof r[19]==='number'?r[19]:-1,
     nx:(r[17]&&typeof r[17]==='object')?{type:String(r[17].type||'').trim(),cls:String(r[17].cls||'').trim(),time:num(r[17].time),weekly:num(r[17].weekly),qty:String(r[17].qty==null?'':r[17].qty),daily:num(r[17].daily),sched:normSched(r[17].sched)}:null};
 }
 /* sched: null = تلقائي (السبت إلى الخميس)، أو مصفوفة من 7 قيم صح/خطأ */
@@ -631,6 +648,7 @@ function render(){
   }
   document.getElementById("groups").innerHTML=html;
   var q=document.querySelector(".qin"); if(q){q.focus();q.select()}
+  var si=document.getElementById("subin"); if(si&&focusSub){si.focus();focusSub=false}
 }
 function rowHtml(i){
   var wk=sel>=7?1:0, p=pct(i,wk), fv=dayv(i,sel), on=fv>=1, part=fv>0&&fv<1;
@@ -648,17 +666,23 @@ function rowHtml(i){
   else if(partRow===i.row)fr='<div class="opanel"><h5>تأجيل الهدف أو إلغاؤه</h5><div class="opts">'+
       (wk||i.st==='p'?'':'<button type="button" class="opt warn" data-st="p" data-row="'+i.row+'">'+ICON_CLOCK+'<span><b>تأجيل للأسبوع القادم</b><small>يختفي الآن ويعود تلقائيًا عند بدء الأسبوع الجديد</small></span></button>')+
       '<button type="button" class="opt bad" data-st="c" data-row="'+i.row+'">'+ICON_X+'<span><b>إلغاء الهدف</b><small>ينتقل إلى «الملغية» ويمكن استرجاعه</small></span></button></div></div>';
+  var ns=i.subs.length, nk=i.subs.filter(function(x){return x.x>=0}).length;
+  if(partRow===i.row&&partMode==="s")fr='<div class="opanel"><h5>أضف هدفًا فرعيًا إلى «'+esc(i.cls)+'»</h5><div class="subadd"><input id="subin" data-row="'+i.row+'" maxlength="80" placeholder="مثل: الباب الأول" aria-label="الهدف الفرعي"><button type="button" class="btn primary" data-subadd="'+i.row+'">إضافة</button></div>'+(ns?'':'<div class="vnote" style="padding:6px 0 0">تعلّم على كل هدف فرعي، وعند إتمامها كلها يُعلَّم الهدف الأساسي تلقائيًا.</div>')+'</div>';
+  var subsH=ns?'<div class="subs">'+i.subs.map(function(x,j){var dn=x.x>=0;
+    return '<div class="sub'+(dn?' done':'')+'"><button type="button" class="stk" data-subtk="'+j+'" data-row="'+i.row+'" aria-pressed="'+dn+'" aria-label="تعليم الهدف الفرعي">'+ICON_CHECK+'</button><span class="st">'+esc(x.t)+'</span><button type="button" class="sdel" data-subdel="'+j+'" data-row="'+i.row+'" aria-label="حذف الهدف الفرعي">×</button></div>'}).join("")+'</div>':'';
   return '<div class="item'+(on?' done':'')+(part?' partial':'')+'" data-row="'+i.row+'" data-type="'+encodeURIComponent(i.type)+'" style="--tc:'+PALETTE[typeColor(i.type)]+'">'+
     '<div class="lead"><button type="button" class="tick'+(part?' part':'')+'"'+(part?' style="--f:'+fv+'"':'')+' data-row="'+i.row+'" aria-pressed="'+on+'" aria-label="تم في '+DAYS[sel%7]+'">'+ICON_CHECK+'</button>'+GRIPB(i)+'</div>'+
     '<div class="body">'+
-      '<div class="l1"><span class="name">'+esc(i.cls)+'</span>'+
-        '<button type="button" class="icon sm" data-act="part" data-row="'+i.row+'" aria-label="تعليم ربع أو نصف" title="تعليم ربع أو نصف" style="font-size:15px;font-weight:700">½</button>'+
+      '<div class="l1"><span class="name">'+esc(i.cls)+'</span>'+(ns?'<span class="subcnt" title="الأهداف الفرعية المنجزة">'+ar(nk)+'/'+ar(ns)+'</span>':'')+'</div>'+
+      '<div class="l2 acts">'+qty+
+        (ns?'':'<button type="button" class="icon sm" data-act="part" data-row="'+i.row+'" aria-label="تعليم ربع أو نصف" title="تعليم ربع أو نصف" style="font-size:15px;font-weight:700">½</button>')+
+        '<button type="button" class="icon sm" data-act="subs" data-row="'+i.row+'" aria-label="إضافة هدف فرعي" title="إضافة هدف فرعي">'+ICON_SUBS+'</button>'+
         '<button type="button" class="icon sm" data-act="later" data-row="'+i.row+'" aria-label="تأجيل إلى الغد أو بعد غد" title="تأجيل إلى الغد أو بعد غد">'+ICON_NEXT+'</button>'+
         '<button type="button" class="icon sm" data-act="more" data-row="'+i.row+'" aria-label="تأجيل أو إلغاء الهدف" title="تأجيل أو إلغاء">'+ICON_X+'</button>'+
         '<button type="button" class="icon sm" data-act="edit" data-row="'+i.row+'" aria-label="تعديل الهدف">'+ICON_EDIT+'</button>'+
         '<button type="button" class="icon sm del" data-act="del" data-row="'+i.row+'" aria-label="حذف الهدف">'+ICON_DEL+'</button></div>'+
-      '<div class="l2">'+qty+'<span>'+i.time+' د</span>'+(part?'<span class="fpart">'+fracName(fv)+' ('+f1(i.time*fv)+' د)</span>':'')+(i.st==='p'?'<span class="fpart">مؤجل من هذا الأسبوع</span>':'')+(i.sched?'<span class="sdays" title="أيام الهدف">'+esc(schedText(i))+'</span>':'')+'<span class="pct">'+f1(p)+'%</span></div>'+
-      '<div class="track"><i style="width:'+Math.min(100,p)+'%;background:'+colorFor(p)+'"></i></div>'+fr+
+      '<div class="l2"><span>'+i.time+' د</span>'+(part?'<span class="fpart">'+fracName(fv)+' ('+f1(i.time*fv)+' د)</span>':'')+(i.st==='p'?'<span class="fpart">مؤجل من هذا الأسبوع</span>':'')+(i.sched?'<span class="sdays" title="أيام الهدف">'+esc(schedText(i))+'</span>':'')+'<span class="pct">'+f1(p)+'%</span></div>'+
+      '<div class="track"><i style="width:'+Math.min(100,p)+'%;background:'+colorFor(p)+'"></i></div>'+subsH+fr+
     '</div></div>';
 }
 
@@ -721,9 +745,23 @@ async function call(name){
       var nxo=v[17];
       if(nxo&&typeof nxo==="object"){v[0]=nxo.type;v[1]=nxo.cls;v[2]=nxo.time;v[3]=nxo.weekly;v[4]=nxo.qty;v[5]=nxo.daily;v[13]=nxo.sched||null}
       if(v.length>17)v[17]=null;
+      var adn=typeof v[19]==="number"?v[19]:-1;
+      if(Array.isArray(v[18]))v[18]=v[18].map(function(sb){var n=Number(sb[1]);return [sb[0],n>=7?n-7:(adn>=7&&n>=0?adn-7:-1)]});
+      if(typeof v[19]==="number")v[19]=adn>=7?adn-7:-1;
     });
   }
   function padNx(x){while(x.length<14)x.push(x.length===13?null:false); if(x[13]===undefined)x[13]=null; if(x[14]===undefined)x[14]=0; if(x[15]===undefined)x[15]=[0,0,0,0,0,0,0]; if(x[16]===undefined)x[16]=normOv(null,14)}
+  function padSubs(x){padNx(x);if(x[17]===undefined)x[17]=null;if(!Array.isArray(x[18]))x[18]=[];if(typeof x[19]!=="number")x[19]=-1}
+  function chkDay(v){var n=Number(v);if(!(n>=0&&n<=13))throw new Error("يوم غير صحيح.");return n}
+  function setDayVal(x,d,v){
+    if(d<7)x[6+d]=dv(v);
+    else{var sn=[0,1,2,3,4,5,6].map(function(k){return Array.isArray(x[15])?dv(x[15][k]):0});sn[d-7]=dv(v);if(x[14]===undefined)x[14]=0;x[15]=sn}
+  }
+  function subSync(x,day){
+    var subs=x[18], all=subs.length>0&&subs.every(function(s){return Number(s[1])>=0}), ad=x[19];
+    if(all&&ad<0){setDayVal(x,day,1);x[19]=day}
+    else if(!all&&ad>=0){setDayVal(x,ad,0);x[19]=-1}
+  }
   function at(row){var x=it[Number(row)-2];if(!x)throw new Error("الهدف غير موجود.");return x}
   function fill(x,g){
     var type=String(g.type||"").trim(), cls=String(g.cls||"").trim(), time=Number(g.time), weekly=Number(g.weekly), daily=Number(g.daily);
@@ -756,10 +794,22 @@ async function call(name){
       break;
     case "api_setStatus": at(a[0])[14]=a[1]==="c"||a[1]==="p"?a[1]:0; break;
     case "api_setDay":
-      var sd=Number(a[1]), sx=at(a[0]);
-      if(!(sd>=0&&sd<=13))throw new Error("يوم غير صحيح.");
-      if(sd<7)sx[6+sd]=dv(a[2]);
-      else{var sn=[0,1,2,3,4,5,6].map(function(k){return Array.isArray(sx[15])?dv(sx[15][k]):0});sn[sd-7]=dv(a[2]);if(sx[14]===undefined)sx[14]=0;sx[15]=sn}
+      setDayVal(at(a[0]),chkDay(a[1]),a[2]); break;
+    case "api_addSub":
+      var ax=at(a[0]), at1=String(a[1]||"").trim().slice(0,80);
+      if(!at1)throw new Error("اكتب الهدف الفرعي.");
+      padSubs(ax); if(ax[18].length>=20)throw new Error("وصلت للحد الأقصى: 20 هدفًا فرعيًا.");
+      ax[18].push([at1,-1]); subSync(ax,chkDay(a[2])); break;
+    case "api_delSub":
+      var dx=at(a[0]); padSubs(dx); if(!dx[18][Number(a[1])])throw new Error("الهدف الفرعي غير موجود.");
+      dx[18].splice(Number(a[1]),1); subSync(dx,chkDay(a[2])); break;
+    case "api_toggleSub":
+      var tx=at(a[0]); padSubs(tx); if(!tx[18][Number(a[1])])throw new Error("الهدف الفرعي غير موجود.");
+      tx[18][Number(a[1])][1]=a[3]?chkDay(a[2]):-1; subSync(tx,chkDay(a[2])); break;
+    case "api_mainTick":
+      var mx=at(a[0]), md=chkDay(a[1]); padSubs(mx);
+      if(a[2]){mx[18].forEach(function(s){if(Number(s[1])<0)s[1]=md});setDayVal(mx,md,1);mx[19]=md}
+      else{setDayVal(mx,md,0);if(mx[19]===md){mx[18].forEach(function(s){s[1]=-1});mx[19]=-1}}
       break;
     case "api_moveDay":
       var mf=Number(a[1]), mt=Number(a[2]), mx=at(a[0]);
@@ -905,8 +955,35 @@ async function setFrac(row,d,nv){
   var ok=await write("api_setDay",[row,d,nv]);
   if(!ok){setDv(it,d,old);render()}
 }
+function snapItem(it){return {subs:it.subs.map(function(s){return {t:s.t,x:s.x}}),ad:it.ad,days:it.days.slice(),nd:it.nd.slice()}}
+function subSyncC(it,day){
+  var all=it.subs.length>0&&it.subs.every(function(s){return s.x>=0});
+  if(all&&it.ad<0){setDv(it,day,1);it.ad=day}
+  else if(!all&&it.ad>=0){setDv(it,it.ad,0);it.ad=-1}
+}
+async function subOp(row,mut,api,args){
+  var it=find(row); if(!it)return;
+  var sn=snapItem(it); mut(it); render();
+  if(!need())return;
+  var ok=await write(api,args);
+  if(!ok){it.subs=sn.subs;it.ad=sn.ad;it.days=sn.days;it.nd=sn.nd;render()}
+}
+var focusSub=false;
+function addSub(row,t){t=String(t||"").trim();if(!t)return;focusSub=true;subOp(row,function(it){if(it.subs.length<20){it.subs.push({t:t,x:-1});subSyncC(it,sel)}},"api_addSub",[row,t,sel])}
+function delSub(row,j){subOp(row,function(it){it.subs.splice(j,1);subSyncC(it,sel)},"api_delSub",[row,j,sel])}
+function toggleSub(row,j){
+  var it=find(row); if(!it||!it.subs[j])return; var on=!(it.subs[j].x>=0), d=sel;
+  subOp(row,function(it2){it2.subs[j].x=on?d:-1;subSyncC(it2,d)},"api_toggleSub",[row,j,d,on]);
+}
+function mainTick(row,d,on){
+  subOp(row,function(it){
+    if(on){it.subs.forEach(function(s){if(s.x<0)s.x=d});setDv(it,d,1);it.ad=d}
+    else{setDv(it,d,0);if(it.ad===d){it.subs.forEach(function(s){s.x=-1});it.ad=-1}}
+  },"api_mainTick",[row,d,on]);
+}
 function toggle(row,d){
   var it=find(row); if(!it)return;
+  if(it.subs.length)return mainTick(row,d,dayv(it,d)<1);
   return setFrac(row,d,dayv(it,d)>=1?0:1);
 }
 async function moveDay(row,from,to){
@@ -1443,6 +1520,9 @@ document.getElementById("outBtn").addEventListener("click",async function(){
 document.addEventListener("click",function(e){
   var pk=e.target.closest&&e.target.closest("[data-pick]"); if(pk){palType=null;setColor(decodeURIComponent(pk.dataset.type),+pk.dataset.pick);return}
   var pl=e.target.closest&&e.target.closest("[data-pal]"); if(pl){var pt=decodeURIComponent(pl.dataset.pal);palType=palType===pt?null:pt;render();return}
+  var stk=e.target.closest&&e.target.closest("[data-subtk]"); if(stk){toggleSub(+stk.dataset.row,+stk.dataset.subtk);return}
+  var sdl=e.target.closest&&e.target.closest("[data-subdel]"); if(sdl){delSub(+sdl.dataset.row,+sdl.dataset.subdel);return}
+  var sad=e.target.closest&&e.target.closest("[data-subadd]"); if(sad){var si0=document.getElementById("subin");addSub(+sad.dataset.subadd,si0?si0.value:"");return}
   var mvb=e.target.closest&&e.target.closest("[data-mv]"); if(mvb){moveDay(+mvb.dataset.row,sel,sel+(+mvb.dataset.mv));return}
   var sb=e.target.closest&&e.target.closest("[data-st]"); if(sb){setSt(+sb.dataset.row,sb.dataset.st);return}
   var vb=e.target.closest&&e.target.closest("[data-view]"); if(vb){view=vb.dataset.view;partRow=null;render();window.scrollTo(0,0);return}
@@ -1454,12 +1534,13 @@ document.addEventListener("click",function(e){
   var ed=e.target.closest&&e.target.closest("[data-edit]"); if(ed){editing=+ed.dataset.edit;render();return}
   var b=e.target.closest&&e.target.closest("[data-act]"); if(b){
     var it=find(+b.dataset.row); if(!it)return;
-    if(b.dataset.act==="part"||b.dataset.act==="more"||b.dataset.act==="later"){var m=b.dataset.act==="part"?"f":b.dataset.act==="more"?"m":"d";partRow=(partRow===it.row&&partMode===m)?null:it.row;partMode=m;render()}
+    if(b.dataset.act==="part"||b.dataset.act==="more"||b.dataset.act==="later"||b.dataset.act==="subs"){var m=b.dataset.act==="part"?"f":b.dataset.act==="more"?"m":b.dataset.act==="later"?"d":"s";if(m==="s")focusSub=true;partRow=(partRow===it.row&&partMode===m)?null:it.row;partMode=m;render()}
     else if(b.dataset.act==="edit"){var ew=sel>=7&&view==="main"?1:0;openForm(ew?eff(it,1):it,ew)}
     else{delRow=it.row;document.getElementById("delMsg").textContent=it.type+" · "+it.cls;delDlg.showModal()}
   }
 });
 document.addEventListener("keydown",function(e){
+  if(e.key==="Enter"&&e.target&&e.target.id==="subin"){e.preventDefault();addSub(+e.target.dataset.row,e.target.value);return}
   var q=e.target.closest&&e.target.closest(".qin"); if(!q)return;
   if(e.key==="Enter"){e.preventDefault();saveQty(+q.dataset.row,q.value.trim())}
   if(e.key==="Escape"){editing=null;render()}
