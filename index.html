@@ -192,7 +192,8 @@ body.dragging *{cursor:grabbing!important}
 .qty:hover{border-color:var(--accent)}
 .qin{font:inherit;font-size:16px;width:100%;max-width:220px;padding:5px 8px;border:1px solid var(--accent);border-radius:8px;background:var(--bg);color:var(--ink)}
 .l2.acts{gap:4px;margin-top:5px;align-items:center}
-.l2.acts .qty{margin-inline-end:4px}
+.l1 .qty{flex:none;max-width:45%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.l1 .qin{max-width:45%}
 .subcnt{font-size:12px;font-weight:600;color:var(--tc,var(--accent));background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:0 8px;flex:none}
 .subs{margin-top:8px;display:flex;flex-direction:column;gap:5px}
 .sub{display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:10px;background:var(--bg);border:1px solid var(--line)}
@@ -673,8 +674,8 @@ function rowHtml(i){
   return '<div class="item'+(on?' done':'')+(part?' partial':'')+'" data-row="'+i.row+'" data-type="'+encodeURIComponent(i.type)+'" style="--tc:'+PALETTE[typeColor(i.type)]+'">'+
     '<div class="lead"><button type="button" class="tick'+(part?' part':'')+'"'+(part?' style="--f:'+fv+'"':'')+' data-row="'+i.row+'" aria-pressed="'+on+'" aria-label="تم في '+DAYS[sel%7]+'">'+ICON_CHECK+'</button>'+GRIPB(i)+'</div>'+
     '<div class="body">'+
-      '<div class="l1"><span class="name">'+esc(i.cls)+'</span>'+(ns?'<span class="subcnt" title="الأهداف الفرعية المنجزة">'+ar(nk)+'/'+ar(ns)+'</span>':'')+'</div>'+
-      '<div class="l2 acts">'+qty+
+      '<div class="l1"><span class="name">'+esc(i.cls)+'</span>'+(ns?'<span class="subcnt" title="الأهداف الفرعية المنجزة">'+ar(nk)+'/'+ar(ns)+'</span>':'')+qty+'</div>'+
+      '<div class="l2 acts">'+
         (ns?'':'<button type="button" class="icon sm" data-act="part" data-row="'+i.row+'" aria-label="تعليم ربع أو نصف" title="تعليم ربع أو نصف" style="font-size:15px;font-weight:700">½</button>')+
         '<button type="button" class="icon sm" data-act="subs" data-row="'+i.row+'" aria-label="إضافة هدف فرعي" title="إضافة هدف فرعي">'+ICON_SUBS+'</button>'+
         '<button type="button" class="icon sm" data-act="later" data-row="'+i.row+'" aria-label="تأجيل إلى الغد أو بعد غد" title="تأجيل إلى الغد أو بعد غد">'+ICON_NEXT+'</button>'+
