@@ -672,9 +672,9 @@ function rowHtml(i){
       return '<button type="button" class="opt" data-mv="'+n+'" data-row="'+i.row+'">'+ICON_NEXT+'<span><b>'+(n===1?"تأجيل إلى الغد":"تأجيل إلى بعد غد")+'</b><small>'+dayLabel(sel+n)+'</small></span></button>'}).join("");
     fr='<div class="opanel"><h5>تأجيل هذا الهدف إلى يوم لاحق</h5>'+(fv>0?'<div class="vnote" style="padding:0">علّمت جزءًا من هذا الهدف في هذا اليوم، امسح التعليم أولًا ثم أجّله.</div>':mv?'<div class="opts">'+mv+'</div>':'<div class="vnote" style="padding:0">لا يوجد يوم لاحق متاح للتأجيل.</div>')+'</div>';
   }
-  else if(partRow===i.row)fr='<div class="opanel"><h5>تأجيل الهدف أو إلغاؤه</h5><div class="opts">'+
+  else if(partRow===i.row)fr='<div class="opanel"><h5>تأجيل الهدف أو حذفه</h5><div class="opts">'+
       (wk||i.st==='p'?'':'<button type="button" class="opt warn" data-st="p" data-row="'+i.row+'">'+ICON_CLOCK+'<span><b>تأجيل للأسبوع القادم</b><small>يختفي الآن ويعود تلقائيًا عند بدء الأسبوع الجديد</small></span></button>')+
-      '<button type="button" class="opt bad" data-st="c" data-row="'+i.row+'">'+ICON_X+'<span><b>إلغاء الهدف</b><small>ينتقل إلى «الملغية» ويمكن استرجاعه</small></span></button></div></div>';
+      '<button type="button" class="opt bad" data-delrow="'+i.row+'">'+ICON_DEL+'<span><b>حذف الهدف نهائيًا</b><small>يُحذف مع كل علاماته ولا يمكن استرجاعه</small></span></button></div></div>';
   var ns=i.subs.length, nk=i.subs.filter(function(x){return x.x>=0}).length;
   if(partRow===i.row&&partMode==="s")fr='<div class="opanel"><h5>أضف هدفًا فرعيًا إلى «'+esc(i.cls)+'»</h5><div class="subadd"><input id="subin" data-row="'+i.row+'" maxlength="80" placeholder="مثل: الباب الأول" aria-label="الهدف الفرعي"><button type="button" class="btn primary" data-subadd="'+i.row+'">إضافة</button></div>'+(ns?'':'<div class="vnote" style="padding:6px 0 0">تعلّم على كل هدف فرعي، وعند إتمامها كلها يُعلَّم الهدف الأساسي تلقائيًا.</div>')+'</div>';
   var subsH=ns?'<div class="subs">'+i.subs.map(function(x,j){var dn=x.x>=0;
@@ -687,7 +687,6 @@ function rowHtml(i){
         (ns?'':'<button type="button" class="icon sm" data-act="part" data-row="'+i.row+'" aria-label="تعليم ربع أو نصف" title="تعليم ربع أو نصف" style="font-size:15px;font-weight:700">½</button>')+
         '<button type="button" class="icon sm" data-act="subs" data-row="'+i.row+'" aria-label="إضافة هدف فرعي" title="إضافة هدف فرعي">'+ICON_SUBS+'</button>'+
         '<button type="button" class="icon sm" data-act="later" data-row="'+i.row+'" aria-label="تأجيل إلى الغد أو بعد غد" title="تأجيل إلى الغد أو بعد غد">'+ICON_NEXT+'</button>'+
-        '<button type="button" class="icon sm" data-act="more" data-row="'+i.row+'" aria-label="تأجيل أو إلغاء الهدف" title="تأجيل أو إلغاء">'+ICON_X+'</button>'+
         '<button type="button" class="icon sm" data-act="edit" data-row="'+i.row+'" aria-label="تعديل الهدف">'+ICON_EDIT+'</button>'+
         '<button type="button" class="icon sm del" data-act="del" data-row="'+i.row+'" aria-label="حذف الهدف">'+ICON_DEL+'</button></div>'+
       '<div class="l2"><span>'+i.time+' د</span>'+(part?'<span class="fpart">'+fracName(fv)+' ('+f1(i.time*fv)+' د)</span>':'')+(i.st==='p'?'<span class="fpart">مؤجل من هذا الأسبوع</span>':'')+(i.sched?'<span class="sdays" title="أيام الهدف">'+esc(schedText(i))+'</span>':'')+'<span class="pct">'+f1(p)+'%</span></div>'+
@@ -1529,6 +1528,7 @@ document.getElementById("outBtn").addEventListener("click",async function(){
 document.addEventListener("click",function(e){
   var pk=e.target.closest&&e.target.closest("[data-pick]"); if(pk){palType=null;setColor(decodeURIComponent(pk.dataset.type),+pk.dataset.pick);return}
   var pl=e.target.closest&&e.target.closest("[data-pal]"); if(pl){var pt=decodeURIComponent(pl.dataset.pal);palType=palType===pt?null:pt;render();return}
+  var dlr=e.target.closest&&e.target.closest("[data-delrow]"); if(dlr){var di=find(+dlr.dataset.delrow); if(di){partRow=null;delRow=di.row;document.getElementById("delMsg").textContent=di.type+" · "+di.cls;delDlg.showModal()}return}
   var stk=e.target.closest&&e.target.closest("[data-subtk]"); if(stk){toggleSub(+stk.dataset.row,+stk.dataset.subtk);return}
   var sdl=e.target.closest&&e.target.closest("[data-subdel]"); if(sdl){delSub(+sdl.dataset.row,+sdl.dataset.subdel);return}
   var sad=e.target.closest&&e.target.closest("[data-subadd]"); if(sad){var si0=document.getElementById("subin");addSub(+sad.dataset.subadd,si0?si0.value:"");return}
@@ -1545,6 +1545,7 @@ document.addEventListener("click",function(e){
     var it=find(+b.dataset.row); if(!it)return;
     if(b.dataset.act==="part"||b.dataset.act==="more"||b.dataset.act==="later"||b.dataset.act==="subs"){var m=b.dataset.act==="part"?"f":b.dataset.act==="more"?"m":b.dataset.act==="later"?"d":"s";if(m==="s")focusSub=true;partRow=(partRow===it.row&&partMode===m)?null:it.row;partMode=m;render()}
     else if(b.dataset.act==="edit"){var ew=sel>=7&&view==="main"?1:0;openForm(ew?eff(it,1):it,ew)}
+    else if(view==="main"&&sel<7&&!it.st){partRow=(partRow===it.row&&partMode==="m")?null:it.row;partMode="m";render()}
     else{delRow=it.row;document.getElementById("delMsg").textContent=it.type+" · "+it.cls;delDlg.showModal()}
   }
 });
