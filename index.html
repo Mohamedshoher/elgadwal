@@ -267,8 +267,11 @@ dialog .acts{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
 .btn:hover{border-color:var(--accent)}
 .btn.danger:hover{border-color:var(--bad);color:var(--bad)}
 .btn.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent);font-weight:600}
+form.add.cyc .hide-cyc{display:none}
 form.add{display:grid;grid-template-columns:1fr 1fr;gap:10px 12px;margin-top:12px}
 form.add label{display:flex;flex-direction:column;gap:3px;font-size:13px;color:var(--muted)}
+form.add label[hidden],form.add p[hidden]{display:none}
+form.add select{font:inherit;font-size:16px;color:var(--ink);padding:9px 10px;border:1px solid var(--line);border-radius:9px;background:var(--bg);width:100%}
 form.add input{font:inherit;font-size:16px;color:var(--ink);padding:9px 10px;border:1px solid var(--line);border-radius:9px;background:var(--bg);width:100%}
 form.add input:focus{border-color:var(--accent)}
 #addDlg{max-width:460px}
@@ -388,7 +391,7 @@ a.mbtn[hidden]{display:none}
       <button class="mbtn" id="wizBtn" type="button"><svg viewBox="0 0 24 24"><path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8L12 3zM18 15l.8 2.2L21 18l-2.2.8L18 21l-.8-2.2L15 18l2.2-.8L18 15z"/></svg>المساعد في تحديد الأهداف</button>
     </div>
     <div class="week">
-      <h3>إنجاز الأسبوع بالوقت</h3>
+      <h3 id="wTitle">إنجاز الأسبوع بالوقت</h3>
       <div class="wtotal" id="wTotal">0%</div>
       <div id="wDays"></div>
     </div>
@@ -430,6 +433,16 @@ a.mbtn[hidden]{display:none}
   <p id="tblMsg" style="margin:8px 0 0;line-height:1.8"></p>
   <form class="add" id="tblForm" style="grid-template-columns:1fr" onsubmit="return false">
     <label>اسم الجدول<input id="tblName" maxlength="40" placeholder="مثل: جدول العمل" autocomplete="off"></label>
+    <label id="tblCycL">دورة الجدول<select id="tblCycle">
+      <option value="week">أسبوعي (يتجدد كل سبت)</option>
+      <option value="d15">كل 15 يومًا</option>
+      <option value="w3">كل 3 أسابيع</option>
+      <option value="m1">شهري</option>
+      <option value="m2">كل شهرين</option>
+      <option value="abs">مطلق (بلا تجديد)</option>
+    </select></label>
+    <label id="tblStartL" hidden>تاريخ بداية الدورة<input id="tblStart" type="date"></label>
+    <p id="tblHint" style="margin:0;font-size:12.5px;color:var(--muted);line-height:1.7"></p>
   </form>
   <div class="err2" id="tblErr" role="alert"></div>
   <div class="acts">
@@ -455,10 +468,10 @@ a.mbtn[hidden]{display:none}
     <label>النوع<input id="fType" list="typeList" required placeholder="مثل: القراءات"></label>
     <label>البند<input id="fCls" required placeholder="مثل: مذكرة ورش"></label>
     <label>الوقت اليومي بالدقائق<input id="fTime" type="number" min="1" step="1" required value="30" inputmode="numeric"></label>
-    <label>الهدف الأسبوعي<input id="fWeekly" type="number" min="0.1" step="any" required inputmode="decimal"></label>
-    <label>الهدف اليومي<input id="fDaily" type="number" min="0.1" step="any" required inputmode="decimal"></label>
+    <label><span id="lWeekly">الهدف الأسبوعي</span><input id="fWeekly" type="number" min="0.1" step="any" required inputmode="decimal"></label>
+    <label class="hide-cyc">الهدف اليومي<input id="fDaily" type="number" min="0.1" step="any" required inputmode="decimal"></label>
     <label>الكم (اختياري)<input id="fQty" placeholder="مثل: 1-40"></label>
-    <div class="sched">
+    <div class="sched hide-cyc">
       <span>أيام الهدف</span>
       <div class="modes">
         <label><input type="radio" name="fMode" value="all" checked> تلقائي: السبت إلى الخميس</label>
@@ -531,7 +544,7 @@ function typeColor(t){
   return h%PALETTE.length;
 }
 var weekNote="";
-function dayDate(d){var base=wkStart||currentWeekStart(),m=base.split('-');return new Date(+m[0],+m[1]-1,+m[2]+d)}
+function dayDate(d){var base=wkStart||cycleNow().start,m=base.split('-');return new Date(+m[0],+m[1]-1,+m[2]+d)}
 function GRIPB(i){return '<button type="button" class="grip" data-grip="goal" data-row="'+i.row+'" aria-label="تحريك الهدف" title="اسحب وأفلت لتحريك الهدف"><svg viewBox="0 0 24 24"><path d="M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01"/></svg></button>'}
 function groupHead(g,right){
   var c=typeColor(g), open=palType===g;
@@ -573,10 +586,10 @@ function dayv(i,d){return dv(d<7?i.days[d]:i.nd[d-7])}
 function setDv(i,d,v){if(d<7)i.days[d]=v;else i.nd[d-7]=v}
 function active(it,d){return !it.st&&rowOn(it,d)}
 function hasFri(){return items.some(function(i){return active(i,6)})}
-function visDays(){return hasFri()||sel===6||todayIdx()===6?[0,1,2,3,4,5,6]:[0,1,2,3,4,5]}
+function visDays(){if(cyLong())return [0];return hasFri()||sel===6||todayIdx()===6?[0,1,2,3,4,5,6]:[0,1,2,3,4,5]}
 function planned(i,d){return i.st!=='c'&&rowOn(i,d)}
 function nextDays(){return sel===13||items.some(function(i){return planned(eff(i,1),13)})?[0,1,2,3,4,5,6]:[0,1,2,3,4,5]}
-function navDays(){return visDays().concat(nextDays().map(function(d){return d+7}))}
+function navDays(){var k=cyK();if(k==="abs"||isLong(k))return visDays();return visDays().concat(nextDays().map(function(d){return d+7}))}
 function schedText(it){
   if(!it.sched)return "";
   var n=it.sched.filter(Boolean).length;
@@ -584,7 +597,7 @@ function schedText(it){
 }
 function num(v){var n=parseFloat(String(v).replace("٫",".").replace(",","."));return isNaN(n)?0:n}
 function esc(s){return String(s).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})}
-function pct(it,wk){if(!it.weekly)return 0;var c=(wk?it.nd:it.days).reduce(function(a,v){return a+dv(v)},0);return Math.min(999,it.daily*c/it.weekly*100)}
+function pct(it,wk){if(cyLong())return dv(it.days[0])*100;if(!it.weekly)return 0;var c=(wk?it.nd:it.days).reduce(function(a,v){return a+dv(v)},0);return Math.min(999,it.daily*c/it.weekly*100)}
 function f1(x){return (Math.round(x*10)/10).toString().replace(".","٫")}
 function todayIdx(){var d=new Date().getDay();return d===6?0:(d===5?6:d+1)}
 function colorFor(p){return p>=100?"var(--good)":p>=50?"var(--accent)":p>0?"var(--warn)":"var(--line)"}
@@ -596,7 +609,8 @@ var ICON_EDIT='<svg viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16v4zM13.5 
 var ICON_DEL='<svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12h10l1-12M9 7V4h6v3"/></svg>';
 
 function missedInfo(){
-  var pos=(wkStart&&wkStart<currentWeekStart())?0:todayIdx(), y=pos-1, yest=[], older=[], seen={};
+  if(cyK()!=="week")return {pos:0,y:-1,yest:[],older:[],count:0};
+  var pos=(wkStart&&wkStart<cycleNow().start)?0:todayIdx(), y=pos-1, yest=[], older=[], seen={};
   items.forEach(function(i){
     if(pct(i,0)>=100-1e-9)return;
     var ym=(y>=0&&active(i,y)&&!i.days[y]), om=[];
@@ -614,7 +628,8 @@ function updateBell(){
 }
 function renderAlert(){
   var m=missedInfo(), h="";
-  if(m.y<0){h='<p>اليوم أول أيام الأسبوع، لا توجد أيام سابقة لعرضها.</p>'}
+  if(cyK()!=="week"){h='<p>التنبيه بما فاتك خاص بالجداول الأسبوعية.</p>'}
+  else if(m.y<0){h='<p>اليوم أول أيام الأسبوع، لا توجد أيام سابقة لعرضها.</p>'}
   else{
     if(m.yest.length){
       h+='<h4>أمس · '+DAYS[m.y]+'</h4>'+m.yest.map(function(i){
@@ -642,14 +657,18 @@ function render(){
   var overall=vd.reduce(function(a,d){return a+dp[d]},0)/vd.length;
 
   document.getElementById("wTotal").textContent=f1(overall)+"%";
-  document.getElementById("wDays").innerHTML=vd.map(function(d){var n=DAYS[d];
+  document.getElementById("wTitle").textContent=cyK()==="week"?"إنجاز الأسبوع بالوقت":cyLong()?"إنجاز الدورة بالوقت":"إنجاز الجدول بالوقت";
+  document.getElementById("wDays").innerHTML=vd.map(function(d){var n=cyLong()?"الدورة":DAYS[d];
     return '<div class="wrow"><span>'+n+'</span><div class="track"><i style="width:'+Math.min(100,dp[d])+'%;background:var(--accent)"></i></div><b>'+f1(dp[d])+'%</b></div>';
   }).join("");
 
   var vi=nd.indexOf(sel), nx=sel>=7, dd=sel%7;
   function dayMins(d){var m=0;items.forEach(function(i0){var i=eff(i0,d>=7?1:0);if(d<7?active(i,d):planned(i,d))m+=i.time});return m}
   function dayPct(d){var tot=0,done=0;items.forEach(function(i0){var i=eff(i0,d>=7?1:0);if(d<7?active(i,d):planned(i,d)){tot+=i.time;done+=i.time*dayv(i,d)}});return tot?done/tot*100:0}
-  document.getElementById("tabs").innerHTML=
+  if(cyLong()){
+    var cb=cycleNow(), fmtD=function(x){return isoDate(x).toLocaleDateString("ar-EG",{day:"numeric",month:"long"})}, left=Math.max(0,Math.round((isoDate(cb.next)-isoDate(iso(new Date())))/864e5));
+    document.getElementById("tabs").innerHTML='<div class="tab today" role="tab" aria-selected="true" style="flex:1;cursor:default"><span class="n">'+CYCLES[cyK()].n+' · '+fmtD(cb.start)+' ← '+fmtD(addDaysIso(cb.next,-1))+'</span><span class="p">باقي '+ar(left)+(left>10?' يومًا':left===1?' يوم':' أيام')+'</span></div>';
+  }else document.getElementById("tabs").innerHTML=
     '<button type="button" class="tarr" data-dnav="-1" aria-label="اليوم السابق"'+(vi<=0?' disabled':'')+'><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>'+
     '<button type="button" class="tab'+(sel===t?' today':'')+'" role="tab" aria-selected="true" data-dnav="today" title="العودة إلى اليوم"><span class="n">'+DAYS[dd]+' / '+fmtMins(dayMins(sel))+'</span></button>'+
     '<button type="button" class="tarr" data-dnav="1" aria-label="اليوم التالي"'+(vi>=nd.length-1?' disabled':'')+'><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button>';
@@ -664,7 +683,7 @@ function render(){
     document.getElementById("sub").textContent="الجداول · "+ar(tablesInfo.length);
     document.getElementById("groups").innerHTML='<div class="vnote">اختر الجدول الذي تريد فتحه. النجمة تجعله الافتراضي، فيفتح عليه التطبيق في كل مرة.</div><div class="card">'+tablesInfo.map(function(t){
       var isCur=t.id===curId, isDef=t.id===defaultId;
-      return '<div class="trow'+(isCur?' cur':'')+'"><button type="button" class="topen" data-tbl="open" data-id="'+t.id+'"><b>'+esc(t.name)+'</b><small>'+ar(t.n)+(t.n>10?' هدفًا':' أهداف')+(isCur?' · المفتوح الآن':'')+(isDef?' · الافتراضي':'')+'</small></button>'+
+      return '<div class="trow'+(isCur?' cur':'')+'"><button type="button" class="topen" data-tbl="open" data-id="'+t.id+'"><b>'+esc(t.name)+'</b><small>'+ar(t.n)+(t.n>10?' هدفًا':' أهداف')+' · '+(CYCLES[t.cy]?CYCLES[t.cy].n:'أسبوعي')+(isCur?' · المفتوح الآن':'')+(isDef?' · الافتراضي':'')+'</small></button>'+
         '<button type="button" class="tbi star'+(isDef?' on':'')+'" data-tbl="def" data-id="'+t.id+'" aria-label="جعله الجدول الافتراضي" title="جعله الافتراضي" aria-pressed="'+isDef+'"><svg viewBox="0 0 24 24"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.8l-5.2 2.8 1-5.8-4.3-4.1 5.9-.9L12 3.5z"/></svg></button>'+
         '<button type="button" class="tbi ren" data-tbl="ren" data-id="'+t.id+'" aria-label="تغيير الاسم" title="تغيير الاسم">'+ICON_EDIT+'</button>'+
         (tablesInfo.length>1?'<button type="button" class="tbi del" data-tbl="del" data-id="'+t.id+'" aria-label="حذف الجدول" title="حذف الجدول">'+ICON_DEL+'</button>':'')+'</div>';
@@ -681,7 +700,7 @@ function render(){
   var live=wk?items.filter(function(i){return i.st!=='c'}).map(function(i){return eff(i,1)}):live0, isDone=function(i){return pct(i,wk)>=100-1e-9};
   var dayItems=live.filter(function(i){return wk?planned(i,sel):active(i,sel)});
   var doneN=dayItems.filter(function(i){return dayv(i,sel)>=1}).length;
-  document.getElementById("sub").textContent=dayDate(sel).toLocaleDateString("ar-EG",{day:"numeric",month:"long",year:"numeric"})+" · أنجزت "+doneN+" من "+dayItems.length;
+  document.getElementById("sub").textContent=(cyK()==="week"?dayDate(sel).toLocaleDateString("ar-EG",{day:"numeric",month:"long",year:"numeric"})+" · ":cyK()==="abs"?"جدول مطلق · ":"")+"أنجزت "+doneN+" من "+dayItems.length;
   var cand=dayItems.filter(function(i){return !isDone(i)});
   var todo=cand.filter(function(i){return dayv(i,sel)<1}), doneToday=cand.filter(function(i){return dayv(i,sel)>=1});
   var order=[], by={};
@@ -707,9 +726,9 @@ function rowHtml(i){
     : '<button type="button" class="qty'+(i.qty?'':' empty')+'" data-edit="'+i.row+'" title="تعديل الكم">'+(i.qty?esc(i.qty):'الكم')+'</button>';
   var fr='';
   if(partRow===i.row&&partMode==="f")fr='<div class="opanel"><h5>كم أنجزت من هذا الهدف؟</h5><div class="fr">'+[[0.25,"ربع"],[0.5,"نصف"],[0.75,"ثلاثة أرباع"],[1,"تم كاملًا"],[0,"مسح"]].map(function(o){
-      return '<button type="button" class="chip'+(fv===o[0]&&fv>0?' on':'')+'" data-frac="'+o[0]+'" data-row="'+i.row+'">'+o[1]+'</button>'}).join("")+'</div></div>';
+      return '<button type="button" class="chip'+(fv===o[0]&&fv>0?' on':'')+'" data-frac="'+o[0]+'" data-row="'+i.row+'">'+o[1]+'</button>'}).join("")+'</div>'+(cyLong()?'<div class="subadd" style="margin-top:8px"><input id="amtin" type="number" min="0" step="any" inputmode="decimal" data-row="'+i.row+'" placeholder="المنجز من '+esc(String(i.weekly))+'" aria-label="المنجز"><button type="button" class="btn primary" data-amt="'+i.row+'">حفظ</button></div>':'')+'</div>';
   else if(partRow===i.row&&partMode==="d"){
-    var mv=[1,2].filter(function(n){return sel+n<=13}).map(function(n){
+    var mv=[1,2].filter(function(n){return sel+n<=(cyK()==="abs"?6:13)}).map(function(n){
       return '<button type="button" class="opt" data-mv="'+n+'" data-row="'+i.row+'">'+ICON_NEXT+'<span><b>'+(n===1?"تأجيل إلى الغد":"تأجيل إلى بعد غد")+'</b><small>'+dayLabel(sel+n)+'</small></span></button>'}).join("");
     fr='<div class="opanel"><h5>تأجيل هذا الهدف إلى يوم لاحق</h5>'+(fv>0?'<div class="vnote" style="padding:0">علّمت جزءًا من هذا الهدف في هذا اليوم، امسح التعليم أولًا ثم أجّله.</div>':mv?'<div class="opts">'+mv+'</div>':'<div class="vnote" style="padding:0">لا يوجد يوم لاحق متاح للتأجيل.</div>')+'</div>';
   }
@@ -727,10 +746,10 @@ function rowHtml(i){
       '<div class="l2 acts">'+
         (ns?'':'<button type="button" class="icon sm" data-act="part" data-row="'+i.row+'" aria-label="تعليم ربع أو نصف" title="تعليم ربع أو نصف" style="font-size:15px;font-weight:700">½</button>')+
         '<button type="button" class="icon sm" data-act="subs" data-row="'+i.row+'" aria-label="إضافة هدف فرعي" title="إضافة هدف فرعي">'+ICON_SUBS+'</button>'+
-        '<button type="button" class="icon sm" data-act="later" data-row="'+i.row+'" aria-label="تأجيل إلى الغد أو بعد غد" title="تأجيل إلى الغد أو بعد غد">'+ICON_NEXT+'</button>'+
+        (cyLong()?'':'<button type="button" class="icon sm" data-act="later" data-row="'+i.row+'" aria-label="تأجيل إلى الغد أو بعد غد" title="تأجيل إلى الغد أو بعد غد">'+ICON_NEXT+'</button>')+
         '<button type="button" class="icon sm" data-act="edit" data-row="'+i.row+'" aria-label="تعديل الهدف">'+ICON_EDIT+'</button>'+
         '<button type="button" class="icon sm del" data-act="del" data-row="'+i.row+'" aria-label="حذف الهدف">'+ICON_DEL+'</button></div>'+
-      '<div class="l2"><span>'+i.time+' د</span>'+(part?'<span class="fpart">'+fracName(fv)+' ('+f1(i.time*fv)+' د)</span>':'')+(i.st==='p'?'<span class="fpart">مؤجل من هذا الأسبوع</span>':'')+(i.sched?'<span class="sdays" title="أيام الهدف">'+esc(schedText(i))+'</span>':'')+'<span class="pct">'+f1(p)+'%</span></div>'+
+      '<div class="l2"><span>'+i.time+' د</span>'+(cyLong()?'<span>الهدف: '+esc(String(i.weekly))+'</span>':'')+(part?'<span class="fpart">'+(cyLong()?ar(Math.round(fv*i.weekly*10)/10)+' من '+ar(i.weekly):fracName(fv)+' ('+f1(i.time*fv)+' د)')+'</span>':'')+(i.st==='p'?'<span class="fpart">مؤجل من هذا الأسبوع</span>':'')+(i.sched?'<span class="sdays" title="أيام الهدف">'+esc(schedText(i))+'</span>':'')+'<span class="pct">'+f1(p)+'%</span></div>'+
       '<div class="track"><i style="width:'+Math.min(100,p)+'%;background:'+colorFor(p)+'"></i></div>'+subsH+fr+
     '</div></div>';
 }
@@ -770,11 +789,14 @@ function sync(){
 /* التخزين على الجهاز: بيانات كل اسم في localStorage */
 var user=null;
 function dkey(){return "wk:data:"+user}
-var curId="", tablesInfo=[], defaultId="", curName="جدول مذاكرة", curUser=null;
+var curId="", tablesInfo=[], defaultId="", curName="جدول مذاكرة", curUser=null, curCycle={kind:"week",start:""};
+function cyK(){return cycleKindOf(curCycle)}
+function cyLong(){return isLong(cyK())}
+function cycleNow(){return cycleBounds(curCycle,iso(new Date()))}
 function normTable(t){
   t=t||{};
   return {id:String(t.id||"t1"),name:String(t.name||"جدول").slice(0,40),items:Array.isArray(t.items)?t.items:[],hist:Array.isArray(t.hist)?t.hist:[],
-    colors:t.colors&&typeof t.colors==="object"&&!Array.isArray(t.colors)?t.colors:{},weekStart:/^\d{4}-\d{2}-\d{2}$/.test(t.weekStart||"")?t.weekStart:""};
+    cycle:normCycle(t.cycle),colors:t.colors&&typeof t.colors==="object"&&!Array.isArray(t.colors)?t.colors:{},weekStart:/^\d{4}-\d{2}-\d{2}$/.test(t.weekStart||"")?t.weekStart:""};
 }
 function normData(r){
   if(r&&Array.isArray(r.tables)&&r.tables.length){
@@ -836,7 +858,7 @@ async function call(name){
   }
   switch(name){
     case "api_init":
-      return {email:user,url:null,colors:d.colors,weekStart:d.weekStart,curId:d.id,curName:d.name,defaultId:D.defaultId,tables:D.tables.map(function(t){return {id:t.id,name:t.name,n:t.items.length}}),rows:it.map(function(v,i){return {row:i+2,v:v}})};
+      return {email:user,url:null,colors:d.colors,weekStart:d.weekStart,curId:d.id,curName:d.name,curCycle:d.cycle,defaultId:D.defaultId,tables:D.tables.map(function(t){return {id:t.id,name:t.name,n:t.items.length,cy:t.cycle.kind}}),rows:it.map(function(v,i){return {row:i+2,v:v}})};
     case "api_setColor":
       var ck=String(a[0]||"").slice(0,80), cv=Number(a[1]);
       if(!ck||!(cv>=0&&cv<PALETTE.length))throw new Error("لون غير صحيح.");
@@ -863,7 +885,11 @@ async function call(name){
       if(D.tables.length>=8)throw new Error("وصلت للحد الأقصى: 8 جداول.");
       if(D.tables.some(function(t){return t.name===tn}))throw new Error("يوجد جدول بهذا الاسم.");
       var nid="t"+Date.now().toString(36)+Math.floor(Math.random()*1296).toString(36);
-      D.tables.push({id:nid,name:tn,items:[],hist:[],colors:{},weekStart:/^\d{4}-\d{2}-\d{2}$/.test(String(a[1]||""))?String(a[1]):""});
+      var tk=String(a[2]||"week"), ts=String(a[3]||""), tt=/^\d{4}-\d{2}-\d{2}$/.test(String(a[1]||""))?String(a[1]):"";
+      if(!CYCLES[tk])throw new Error("دورة غير صحيحة.");
+      if(isLong(tk)&&!/^\d{4}-\d{2}-\d{2}$/.test(ts))throw new Error("اختر تاريخ بداية الدورة.");
+      var tcy=normCycle({kind:tk,start:ts});
+      D.tables.push({id:nid,name:tn,cycle:tcy,items:[],hist:[],colors:{},weekStart:tt?cycleBounds(tcy,tt).start:""});
       res={ok:true,id:nid}; break;
     case "api_tableRename":
       var rt=D.tables.filter(function(t){return t.id===a[0]})[0], rn2=String(a[1]||"").trim().slice(0,40);
@@ -922,8 +948,10 @@ async function call(name){
     case "api_deleteGoal": at(a[0]); it.splice(Number(a[0])-2,1); break;
       break;
     case "api_rollover":
-      var cw=String(a[0]||"");
-      if(!/^\d{4}-\d{2}-\d{2}$/.test(cw))throw new Error("تاريخ غير صحيح.");
+      var td0=String(a[0]||"");
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(td0))throw new Error("تاريخ غير صحيح.");
+      if(cycleKindOf(d.cycle)==="abs")return {ok:true,rolled:false};
+      var cw=cycleBounds(d.cycle,td0).start;
       if(!d.weekStart){d.weekStart=cw;break}
       if(d.weekStart>=cw)return {ok:true,rolled:false};
       var old=d.weekStart;
@@ -999,7 +1027,7 @@ async function cPull(force){
   }
   cPulling=false;
 }
-function maybeRoll(){if(user&&mcp&&wkStart&&wkStart<currentWeekStart()&&!pending)load()}
+function maybeRoll(){if(user&&mcp&&cyK()!=="abs"&&wkStart&&wkStart<cycleNow().start&&!pending)load()}
 document.addEventListener("visibilitychange",function(){if(!document.hidden){maybeRoll();cPull(false)}});
 setInterval(maybeRoll,60000);
 window.addEventListener("online",function(){if(cDirty)cSchedule();else cPull(true)});
@@ -1016,11 +1044,11 @@ async function load(){
   if(curUser!==user){curUser=user;curId="";sawLoad=false}
   setStatus("busy","جارٍ التحديث…");
   try{
-    var rr=await call("api_rollover",currentWeekStart());
+    var rr=await call("api_rollover",iso(new Date()));
     var d=await call("api_init");
-    curId=d.curId; tablesInfo=d.tables||[]; defaultId=d.defaultId; curName=d.curName||"جدول مذاكرة";
+    curId=d.curId; tablesInfo=d.tables||[]; defaultId=d.defaultId; curName=d.curName||"جدول مذاكرة"; curCycle=normCycle(d.curCycle);
     items=(d.rows||[]).map(function(r){return mk(r.v,r.row)}); colors=d.colors||{}; wkStart=d.weekStart||""; if(!sawLoad){sawLoad=true;sel=todayIdx()}
-    if(rr&&rr.rolled){hist=null;weekNote="بدأ أسبوع جديد، وحُفظ أسبوع "+fmtDate(rr.date)+" في السجل."}
+    if(rr&&rr.rolled){hist=null;weekNote=cyK()==="week"?"بدأ أسبوع جديد، وحُفظ أسبوع "+fmtDate(rr.date)+" في السجل.":"بدأت دورة جديدة، وحُفظت الدورة التي بدأت "+fmtDate(rr.date)+" في السجل."}
     setAccount(d); banner(weekNote); weekNote=""; render(); sync();
   }catch(e){setStatus("err","تعذّر التحديث");banner(explain(e));render()}
 }
@@ -1147,11 +1175,27 @@ function tblOpen(mode,id){
   document.getElementById("tblTitle").textContent=mode==="new"?"جدول جديد":mode==="ren"?"تغيير اسم الجدول":"حذف الجدول؟";
   var del=mode==="del";
   document.getElementById("tblForm").hidden=del;
+  var isNew=mode==="new";
+  document.getElementById("tblCycL").hidden=!isNew; document.getElementById("tblHint").hidden=!isNew;
+  document.getElementById("tblCycle").value="week"; document.getElementById("tblStart").value=iso(new Date());
+  tblCycleUI();
   document.getElementById("tblMsg").textContent=del&&t?("«"+t.name+"» بكل أهدافه وسجله، ولا يمكن استرجاعه."):"";
   document.getElementById("tblName").value=mode==="ren"&&t?t.name:"";
   var y=document.getElementById("tblYes"); y.textContent=del?"حذف":mode==="new"?"إنشاء":"حفظ"; y.className="btn "+(del?"danger":"primary");
   tblDlg.showModal(); if(!del)document.getElementById("tblName").focus();
 }
+var CYC_HINT={week:"أهدافك وعلاماتك لأسبوع (سبت إلى جمعة)، وكل سبت يبدأ أسبوع جديد بنفس الأهداف دون علامات، ويُحفظ المنتهي في السجل.",
+  d15:"دورة من 15 يومًا: تعلّم كل هدف مرة واحدة للدورة كلها، ثم تبدأ دورة جديدة بنفس الأهداف دون علامات.",
+  w3:"دورة من 3 أسابيع: تعلّم كل هدف مرة واحدة للدورة كلها، ثم تتجدد.",
+  m1:"دورة شهرية: تعلّم كل هدف مرة واحدة للشهر كله، ثم يبدأ شهر جديد بنفس الأهداف دون علامات.",
+  m2:"دورة من شهرين: تعلّم كل هدف مرة واحدة للدورة كلها، ثم تتجدد.",
+  abs:"جدول مطلق: بشكل الأسبوع (أيام) لكنه لا يتجدد ولا يُمسح ولا يُحفظ في السجل أبدًا."};
+function tblCycleUI(){
+  var k=document.getElementById("tblCycle").value;
+  document.getElementById("tblStartL").hidden=!(tblMode==="new"&&isLong(k));
+  document.getElementById("tblHint").textContent=tblMode==="new"?(CYC_HINT[k]||""):"";
+}
+document.getElementById("tblCycle").addEventListener("change",tblCycleUI);
 async function tableAction(a,id){
   if(a==="open"){switchTable(id);return}
   if(a==="new"||a==="ren"||a==="del"){tblOpen(a,id);return}
@@ -1168,11 +1212,13 @@ document.getElementById("tblYes").addEventListener("click",async function(){
     if(!name){err.textContent="اكتب اسم الجدول.";return}
     if(tablesInfo.some(function(t){return t.name===name&&t.id!==tblId})){err.textContent="يوجد جدول بهذا الاسم.";return}
     if(tblMode==="new"&&tablesInfo.length>=8){err.textContent="وصلت للحد الأقصى: 8 جداول.";return}
+    if(tblMode==="new"&&isLong(document.getElementById("tblCycle").value)&&!/^\d{4}-\d{2}-\d{2}$/.test(document.getElementById("tblStart").value)){err.textContent="اختر تاريخ بداية الدورة.";return}
   }
   tblDlg.close();
   if(!need())return;
   if(tblMode==="new"){
-    var r=await write("api_tableAdd",[name,currentWeekStart()]);
+    var ck=document.getElementById("tblCycle").value;
+    var r=await write("api_tableAdd",[name,iso(new Date()),ck,isLong(ck)?document.getElementById("tblStart").value:""]);
     if(r&&r.id)await switchTable(r.id);
   }else if(tblMode==="ren"){
     var ok=await write("api_tableRename",[tblId,name]); if(ok)await load();
@@ -1263,6 +1309,8 @@ Array.prototype.forEach.call(document.querySelectorAll('input[name=fMode]'),func
 var editWk=0;
 function openForm(it,wk){
   editRow=it?it.row:null; editWk=it&&wk?1:0;
+  document.getElementById("addForm").classList.toggle("cyc",cyLong());
+  document.getElementById("lWeekly").textContent=cyLong()?"هدف الدورة (رقم، مثل: 100 صفحة)":"الهدف الأسبوعي";
   document.getElementById("addForm").reset();
   document.getElementById("addTitle").textContent=it?(editWk?"تعديل الهدف (للأسبوع القادم فقط)":"تعديل الهدف"):"إضافة هدف جديد";
   document.getElementById("addYes").textContent=it?"حفظ":"إضافة";
@@ -1283,7 +1331,8 @@ document.getElementById("addNo").addEventListener("click",function(){addDlg.clos
 document.getElementById("addYes").addEventListener("click",async function(){
   var v=function(id){return document.getElementById(id).value.trim()}, err=document.getElementById("addErr");
   var g={type:v("fType"),cls:v("fCls"),time:num(v("fTime")),weekly:num(v("fWeekly")),daily:num(v("fDaily")),qty:v("fQty"),sched:null};
-  if(document.querySelector('input[name=fMode]:checked').value==="custom"){
+  if(cyLong()){g.daily=1;g.sched=null}
+  else if(document.querySelector('input[name=fMode]:checked').value==="custom"){
     if(!fSched.some(Boolean)){err.textContent="اختر يومًا واحدًا على الأقل.";return}
     g.sched=fSched.slice();
   }
@@ -1297,6 +1346,23 @@ document.getElementById("delNo").addEventListener("click",function(){delDlg.clos
 document.getElementById("delYes").addEventListener("click",function(){delDlg.close();if(delRow!==null)deleteGoal(delRow)});
 /* السجل: أرشفة الأسبوع وعرضه */
 var HIST="السجل", SHORT=["س","ح","ن","ث","ر","خ"];
+var CYCLES={week:{n:"أسبوعي"},d15:{n:"15 يومًا",days:15},w3:{n:"3 أسابيع",days:21},m1:{n:"شهر",months:1},m2:{n:"شهران",months:2},abs:{n:"مطلق"}};
+function isoDate(s){var m=s.split("-");return new Date(+m[0],+m[1]-1,+m[2])}
+function addDaysIso(s,n){var d=isoDate(s);d.setDate(d.getDate()+n);return iso(d)}
+function addMonthsIso(s,k){var m=s.split("-").map(Number),mo=m[1]-1+k,last=new Date(m[0],mo+1,0).getDate();return iso(new Date(m[0],mo,Math.min(m[2],last)))}
+function weekStartOfIso(s){var d=isoDate(s);d.setDate(d.getDate()-((d.getDay()+1)%7));return iso(d)}
+function cycleKindOf(cy){return cy&&CYCLES[cy.kind]?cy.kind:"week"}
+function isLong(k){return k==="d15"||k==="w3"||k==="m1"||k==="m2"}
+function normCycle(c){var k=cycleKindOf(c);return {kind:k,start:isLong(k)&&/^\d{4}-\d{2}-\d{2}$/.test((c&&c.start)||"")?c.start:""}}
+function cycleBounds(cy,today){
+  var k=cycleKindOf(cy);
+  if(!isLong(k)||!cy.start){var ws=weekStartOfIso(today);return {start:ws,next:addDaysIso(ws,7)}}
+  var st=cy.start, c=CYCLES[k];
+  if(today<st)return {start:st,next:c.days?addDaysIso(st,c.days):addMonthsIso(st,c.months)};
+  if(c.days){var q=Math.floor(Math.round((isoDate(today)-isoDate(st))/864e5)/c.days), s0=addDaysIso(st,q*c.days);return {start:s0,next:addDaysIso(s0,c.days)}}
+  var n=0; while(addMonthsIso(st,(n+1)*c.months)<=today)n++;
+  return {start:addMonthsIso(st,n*c.months),next:addMonthsIso(st,(n+1)*c.months)};
+}
 function pad2(n){return ("0"+n).slice(-2)}
 function iso(d){return d.getFullYear()+"-"+pad2(d.getMonth()+1)+"-"+pad2(d.getDate())}
 function fmtDate(s){var m=s.split("-");return new Date(+m[0],+m[1]-1,+m[2]).toLocaleDateString("ar-EG",{day:"numeric",month:"long",year:"numeric"})}
@@ -1316,7 +1382,7 @@ function currentWeekStart(){var d=new Date();d.setDate(d.getDate()-((d.getDay()+
 function buildDayMap(){
   var weeks={}, map={};
   if(hist){Object.keys(hist.weeks).forEach(function(k){weeks[k]=hist.weeks[k]})}
-  var cw=wkStart||currentWeekStart();
+  var cw=wkStart||cycleNow().start;
   if(!weeks[cw]){weeks[cw]=items.filter(function(i){return !i.st||i.days.some(Boolean)}).map(function(i){return {type:i.type,cls:i.cls,time:i.time,days:i.days,sched:i.sched,ov:i.ov.slice(0,7)}})}
   Object.keys(weeks).forEach(function(ws){
     var rows=weeks[ws], m=ws.split("-"), st=weekStats(rows);
@@ -1328,7 +1394,24 @@ function buildDayMap(){
   return map;
 }
 function ar(n){return Number(n).toLocaleString("ar-EG",{useGrouping:false})}
+function renderCycleHist(){
+  histTitle.textContent="سجل الدورات"; histBack.hidden=true;
+  var k=cyK(), fmtD=function(x){return isoDate(x).toLocaleDateString("ar-EG",{day:"numeric",month:"long",year:"numeric"})};
+  if(k==="abs"){histBody.innerHTML='<div class="hnote">هذا جدول مطلق: لا يتجدد ولا يُحفظ له سجل.</div>';return}
+  var c=CYCLES[k], weeks=hist?hist.weeks:{}, keys=Object.keys(weeks).sort().reverse(), h="";
+  function block(title,rows){
+    var tot=0,done=0; rows.forEach(function(r){tot+=r.time;done+=r.time*dv(r.days[0])});
+    var pc=tot?done/tot*100:0;
+    return '<div class="wsum"><div class="mh"><span>'+title+'</span><span>'+f1(pc)+'%</span></div>'+rows.map(function(r){
+      return '<div class="sr"><span>'+esc(r.cls)+' <small style="color:var(--muted)">· '+esc(r.type)+'</small></span><span>'+f1(dv(r.days[0])*100)+'%</span></div>'}).join("")+'</div>';
+  }
+  var cur=items.filter(function(i){return i.st!=='c'}).map(function(i){return {type:i.type,cls:i.cls,time:i.time,days:i.days}});
+  h+=cur.length?block("الدورة الحالية · بدأت "+fmtD(wkStart||cycleNow().start),cur):'';
+  keys.forEach(function(d){h+=block("دورة بدأت "+fmtD(d),weeks[d])});
+  histBody.innerHTML=h||'<div class="hnote">لا توجد دورات محفوظة بعد.</div>';
+}
 function renderCal(){
+  if(cyLong()||cyK()==="abs"){renderCycleHist();return}
   histTitle.textContent="سجل الأيام"; histBack.hidden=true;
   var map=buildDayMap(), todayIso=iso(new Date());
   var first=new Date(calY,calM,1), blanks=(first.getDay()+1)%7, days=new Date(calY,calM+1,0).getDate();
@@ -1459,11 +1542,11 @@ function wzBudget(){
 }
 function wzGoals(){
   var nd=wz.days.filter(Boolean).length, std=[true,true,true,true,true,true,false], same=wz.days.every(function(v,d){return v===std[d]});
-  var sched=same?null:wz.days.slice(), out=[];
+  var sched=(same||cyLong())?null:wz.days.slice(), out=[], wk0=cyLong()?1:nd;
   wz.mains.forEach(function(m){
     var subs=m.subs.filter(wzFilled), t=String(m.name).trim();
-    if(!subs.length)out.push({type:t,cls:t,time:Number(m.mins),weekly:nd,daily:1,qty:String(m.qty||"").trim(),sched:sched});
-    else subs.forEach(function(x){out.push({type:t,cls:String(x.name).trim(),time:Number(x.mins),weekly:nd,daily:1,qty:String(x.qty||"").trim(),sched:sched})});
+    if(!subs.length)out.push({type:t,cls:t,time:Number(m.mins),weekly:wk0,daily:1,qty:String(m.qty||"").trim(),sched:sched});
+    else subs.forEach(function(x){out.push({type:t,cls:String(x.name).trim(),time:Number(x.mins),weekly:wk0,daily:1,qty:String(x.qty||"").trim(),sched:sched})});
   });
   return out;
 }
@@ -1660,6 +1743,7 @@ document.addEventListener("click",function(e){
   var pl=e.target.closest&&e.target.closest("[data-pal]"); if(pl){var pt=decodeURIComponent(pl.dataset.pal);palType=palType===pt?null:pt;render();return}
   var tb=e.target.closest&&e.target.closest("[data-tbl]"); if(tb){tableAction(tb.dataset.tbl,tb.dataset.id);return}
   var dlr=e.target.closest&&e.target.closest("[data-delrow]"); if(dlr){var di=find(+dlr.dataset.delrow); if(di){partRow=null;delRow=di.row;document.getElementById("delMsg").textContent=di.type+" · "+di.cls;delDlg.showModal()}return}
+  var amb=e.target.closest&&e.target.closest("[data-amt]"); if(amb){var ai=find(+amb.dataset.amt), av=document.getElementById("amtin"); if(ai&&av&&av.value!==""){var fr0=Math.max(0,Math.min(1,num(av.value)/(ai.weekly||1)));partRow=null;if(ai.subs.length){}setFrac(ai.row,0,fr0)}return}
   var stk=e.target.closest&&e.target.closest("[data-subtk]"); if(stk){toggleSub(+stk.dataset.row,+stk.dataset.subtk);return}
   var sdl=e.target.closest&&e.target.closest("[data-subdel]"); if(sdl){delSub(+sdl.dataset.row,+sdl.dataset.subdel);return}
   var sad=e.target.closest&&e.target.closest("[data-subadd]"); if(sad){var si0=document.getElementById("subin");addSub(+sad.dataset.subadd,si0?si0.value:"");return}
@@ -1682,6 +1766,7 @@ document.addEventListener("click",function(e){
 });
 document.addEventListener("keydown",function(e){
   if(e.key==="Enter"&&e.target&&e.target.id==="subin"){e.preventDefault();addSub(+e.target.dataset.row,e.target.value);return}
+  if(e.key==="Enter"&&e.target&&e.target.id==="amtin"){e.preventDefault();var b0=document.querySelector("[data-amt]");if(b0)b0.click();return}
   var q=e.target.closest&&e.target.closest(".qin"); if(!q)return;
   if(e.key==="Enter"){e.preventDefault();saveQty(+q.dataset.row,q.value.trim())}
   if(e.key==="Escape"){editing=null;render()}
